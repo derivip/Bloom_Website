@@ -27,20 +27,39 @@ async function fetchTasks() {
 
 async function handleAddTask(e) {
     e.preventDefault();
-    const title = document.getElementById('task-title').value;
-    const priority = document.getElementById('task-priority').value;
-    const category = document.getElementById('task-category').value;
+    console.log("1. Form submit triggered!");
 
-    const { error } = await supabaseClient
-        .from('tasks')
-        .insert([{ title, priority, category, completed: false }]);
+    const titleInput = document.getElementById('task-title');
+    const priorityInput = document.getElementById('task-priority');
+    const categoryInput = document.getElementById('task-category');
 
-    if (error) {
-        console.error('Error adding task:', error);
+    if (!titleInput || !priorityInput || !categoryInput) {
+        console.error("Error: Form input elements missing from DOM!");
         return;
     }
 
-    document.getElementById('task-title').value = '';
+    const newTask = {
+        title: titleInput.value,
+        priority: priorityInput.value,
+        category: categoryInput.value,
+        completed: false
+    };
+
+    console.log("2. Sending payload to Supabase:", newTask);
+
+    const { data, error } = await supabaseClient
+        .from('tasks')
+        .insert([newTask])
+        .select();
+
+    if (error) {
+        console.error("3. Supabase Error:", error.message, error.details);
+        alert("Failed to save task: " + error.message);
+        return;
+    }
+
+    console.log("4. Task successfully saved!", data);
+    titleInput.value = '';
     fetchTasks();
 }
 

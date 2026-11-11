@@ -1,5 +1,74 @@
 // BLOOM APPLICATION SCRIPT (2026 EDITION)
+// SUPABASE CONFIGURATION
+const SUPABASE_URL = 'https://xmqmrkqyjnbupyalhnib.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_7AqK322TINFq1y39lMgvTw_Z7Itc79G';
 
+// Initialize Supabase Client
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// --- UPDATED TASK MANAGEMENT WITH SUPABASE ---
+let tasks = [];
+let currentFilter = 'all';
+
+async function fetchTasks() {
+    const { data, error } = await supabaseClient
+        .from('tasks')
+        .select('*')
+        .order('created_at', { ascending: false });
+    
+    if (error) {
+        console.error('Error fetching tasks:', error);
+        return;
+    }
+    tasks = data || [];
+    renderTasks();
+}
+
+async function handleAddTask(e) {
+    e.preventDefault();
+    const title = document.getElementById('task-title').value;
+    const priority = document.getElementById('task-priority').value;
+    const category = document.getElementById('task-category').value;
+
+    const { error } = await supabaseClient
+        .from('tasks')
+        .insert([{ title, priority, category, completed: false }]);
+
+    if (error) {
+        console.error('Error adding task:', error);
+        return;
+    }
+
+    document.getElementById('task-title').value = '';
+    fetchTasks();
+}
+
+async function toggleTask(id, currentStatus) {
+    const { error } = await supabaseClient
+        .from('tasks')
+        .update({ completed: !currentStatus })
+        .eq('id', id);
+
+    if (error) console.error('Error updating task:', error);
+    fetchTasks();
+}
+
+async function deleteTask(id) {
+    const { error } = await supabaseClient
+        .from('tasks')
+        .delete()
+        .eq('id', id);
+
+    if (error) console.error('Error deleting task:', error);
+    fetchTasks();
+}
+
+// Make sure to call fetchTasks() on DOM load instead of local storage
+document.addEventListener('DOMContentLoaded', () => {
+    lucide.createIcons();
+    fetchTasks();
+    switchCategory('career');
+});
 // 1. POP CULTURE / MOVIE INSPIRATIONAL QUOTES (30s Rotation)
 const quotes = [
     { text: '"It’s not about having time, it’s about making time."', source: 'Captain America (Avengers: Endgame)' },

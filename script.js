@@ -4,7 +4,8 @@ const SUPABASE_URL = 'https://xmqmrkqyjnbupyalhnib.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_7AqK322TINFq1y39lMgvTw_Z7Itc79G';
 
 // Initialize Supabase Client
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabaseClient = window.supabase.createClient(:https://xmqmrkqyjnbupyalhnib.supabase.co
+                                                    , sb_publishable_7AqK322TINFq1y39lMgvTw_Z7Itc79G);
 
 // --- UPDATED TASK MANAGEMENT WITH SUPABASE ---
 let tasks = [];

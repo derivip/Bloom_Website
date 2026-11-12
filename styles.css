@@ -1,0 +1,21 @@
+/* CUSTOM STYLING FOR BLOOM */
+@keyframes spinSlow {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.animate-spin-slow {
+    animation: spinSlow 12s linear infinite;
+}
+
+.animated-gradient-hero {
+    background: linear-gradient(-45deg, #e11d48, #9333ea, #4f46e5, #0ea5e9);
+    background-size: 400% 400%;
+    animation: gradientShift 15s ease infinite;
+}
+
+@keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}

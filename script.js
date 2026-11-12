@@ -354,7 +354,7 @@ function handleSendMessage(e) {
 // --- SUPABASE AUTHENTICATION LOGIC ---
 let isSignUpMode = false;
 
-function toggleAuthMode() {
+/*function toggleAuthMode() {
     isSignUpMode = !isSignUpMode;
     document.getElementById('auth-title').innerText = isSignUpMode ? 'Create Account' : 'Welcome Back';
     document.getElementById('auth-subtitle').innerText = isSignUpMode 
@@ -364,6 +364,22 @@ function toggleAuthMode() {
     document.getElementById('auth-toggle-btn').innerHTML = isSignUpMode 
         ? 'Already have an account? <span class="font-bold text-white">Sign In</span>' 
         : "Don't have an account? <span class=\"font-bold text-white">Sign Up</span>";
+    document.getElementById('auth-error').classList.add('hidden');
+}*/
+
+function toggleAuthMode() {
+    isSignUpMode = !isSignUpMode;
+    document.getElementById('auth-title').innerText = isSignUpMode ? 'Create Account': 'Welcome Back';
+    document.getElementById('auth-subtitle').innerText = isSignUpMode 
+        ? 'Join Bloom to organize your focus and peace of mind.' 
+        : 'Sign in to sync your tasks and Bloom AI chats.';
+    document.getElementById('auth-submit-btn').innerText = isSignUpMode ? 'Sign Up': 'Sign In';
+    
+    // FIX: Use double quotes outside, or escape the single quote with \'
+    document.getElementById('auth-toggle-btn').innerHTML = isSignUpMode 
+        ? 'Already have an account? <span class="font-bold text-white">Sign In</span>' 
+        : "Don't have an account? <span class=\"font-bold text-white\">Sign Up</span>";
+        
     document.getElementById('auth-error').classList.add('hidden');
 }
 

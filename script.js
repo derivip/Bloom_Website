@@ -363,7 +363,7 @@ function toggleAuthMode() {
     document.getElementById('auth-submit-btn').innerText = isSignUpMode ? 'Sign Up' : 'Sign In';
     document.getElementById('auth-toggle-btn').innerHTML = isSignUpMode 
         ? 'Already have an account? <span class="font-bold text-white">Sign In</span>' 
-        : 'Don't have an account? <span class="font-bold text-white">Sign Up</span>';
+        : "Don't have an account? <span class="font-bold text-white">Sign Up</span>";
     document.getElementById('auth-error').classList.add('hidden');
 }
 

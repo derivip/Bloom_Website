@@ -1,10 +1,7 @@
-// BLOOM APPLICATION SCRIPT (2026 EDITION - SUPABASE INTEGRATED)
+// BLOOM APPLICATION SCRIPT (2026 EDITION - SUPABASE & GEMINI EDGE FUNCTION INTEGRATED)
 
-// SUPABASE CONFIGURATION
 const SUPABASE_URL = 'https://xmqmrkqyjnbupyalhnib.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_7AqK322TINFq1y39lMgvTw_Z7Itc79G';
-
-// Initialize Supabase Client
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // --- TASK MANAGEMENT WITH SUPABASE ---
@@ -16,7 +13,7 @@ async function fetchTasks() {
         .from('tasks')
         .select('*')
         .order('created_at', { ascending: false });
-    
+
     if (error) {
         console.error('Error fetching tasks:', error);
         return;
@@ -27,16 +24,11 @@ async function fetchTasks() {
 
 async function handleAddTask(e) {
     e.preventDefault();
-    console.log("1. Form submit triggered!");
-
     const titleInput = document.getElementById('task-title');
     const priorityInput = document.getElementById('task-priority');
     const categoryInput = document.getElementById('task-category');
 
-    if (!titleInput || !priorityInput || !categoryInput) {
-        console.error("Error: Form input elements missing from DOM!");
-        return;
-    }
+    if (!titleInput || !priorityInput || !categoryInput) return;
 
     const newTask = {
         title: titleInput.value,
@@ -45,20 +37,16 @@ async function handleAddTask(e) {
         completed: false
     };
 
-    console.log("2. Sending payload to Supabase:", newTask);
-
-    const { data, error } = await supabaseClient
+    const { error } = await supabaseClient
         .from('tasks')
-        .insert([newTask])
-        .select();
+        .insert([newTask]);
 
     if (error) {
-        console.error("3. Supabase Error:", error.message, error.details);
+        console.error("Supabase Error:", error.message);
         alert("Failed to save task: " + error.message);
         return;
     }
 
-    console.log("4. Task successfully saved!", data);
     titleInput.value = '';
     fetchTasks();
 }
@@ -108,6 +96,58 @@ function filterTasks(priority) {
     renderTasks();
 }
 
+// --- GEMINI AI MICRO-STEPS FOR TASKS ---
+async function fetchAiMicroSteps(taskTitle, elementId) {
+    const container = document.getElementById(elementId);
+    if (!container) return;
+
+    container.innerHTML = `<p class="text-xs text-teal-400 animate-pulse mt-2 flex items-center gap-1.5"><i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Generating BloomAI Micro-Steps...</p>`;
+    lucide.createIcons();
+
+    const prompt = `Break down this task into 3 short, actionable, youth-friendly micro-steps to reduce overwhelm: "${taskTitle}". Return only the 3 numbered steps (1., 2., 3.) as plain text lines without markdown bolding.`;
+
+    try {
+        const { data, error } = await supabaseClient.functions.invoke('gemini-proxy', {
+            body: { prompt: prompt }
+        });
+
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error.message || JSON.stringify(data.error));
+
+        const stepsText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "1. Review task details and requirements.\n2. Break it into smaller 10-minute blocks.\n3. Complete the very first small action.";
+        const escapedTitle = taskTitle.replace(/'/g, "\\'");
+
+        container.innerHTML = `
+            <div class="mt-3 p-3.5 rounded-xl bg-slate-950/90 border border-teal-500/30 text-xs space-y-2 shadow-inner">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-teal-400 font-bold flex items-center gap-1">
+                            <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                            BloomAI Micro-Steps (Do just the first 1):
+                        </span>
+                        <span class="text-[10px] font-semibold bg-teal-500/15 text-teal-300 px-2 py-0.5 rounded border border-teal-500/30">Gemini AI</span>
+                    </div>
+                    <button onclick="fetchAiMicroSteps('${escapedTitle}', '${elementId}')" class="text-[11px] text-slate-400 hover:text-teal-300 flex items-center gap-1 transition-colors">
+                        <i data-lucide="refresh-cw" class="w-3 h-3"></i>
+                        <span>Regenerate with AI</span>
+                    </button>
+                </div>
+                <div class="text-slate-200 whitespace-pre-line leading-relaxed pl-1">${stepsText.trim()}</div>
+            </div>
+        `;
+    } catch (err) {
+        console.error("Micro-steps error:", err);
+        const escapedTitle = taskTitle.replace(/'/g, "\\'");
+        container.innerHTML = `
+            <div class="mt-2 flex items-center justify-between text-xs text-rose-400">
+                <span>AI Error: ${err.message}</span>
+                <button onclick="fetchAiMicroSteps('${escapedTitle}', '${elementId}')" class="underline hover:text-rose-300">Retry</button>
+            </div>
+        `;
+    }
+    lucide.createIcons();
+}
+
 function renderTasks() {
     const container = document.getElementById('tasks-container');
     if (!container) return;
@@ -119,7 +159,7 @@ function renderTasks() {
 
     const completedCount = tasks.filter(t => t.completed).length;
     const progressPct = tasks.length ? Math.round((completedCount / tasks.length) * 100) : 0;
-    
+
     const progressBar = document.getElementById('task-progress-bar');
     const progressText = document.getElementById('task-progress-text');
     if (progressBar) progressBar.style.width = `${progressPct}%`;
@@ -140,25 +180,36 @@ function renderTasks() {
         low: '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">LOW</span>'
     };
 
-    container.innerHTML = filtered.map(t => `
-        <div class="p-4 rounded-2xl bg-slate-900/80 border ${t.completed ? 'border-slate-800 opacity-60' : 'border-white/10'} flex items-center justify-between transition-all hover:border-white/20">
-            <div class="flex items-center space-x-3">
-                <button onclick="toggleTask(${t.id})" class="p-1 rounded-lg ${t.completed ? 'bg-rose-500 text-white' : 'border border-slate-600 hover:border-rose-400'}">
-                    <i data-lucide="${t.completed ? 'check-square' : 'square'}" class="w-5 h-5"></i>
-                </button>
-                <div>
-                    <p class="text-sm font-semibold text-white ${t.completed ? 'line-through text-slate-500' : ''}">${t.title}</p>
-                    <span class="text-xs text-slate-400">${t.category}</span>
+    container.innerHTML = filtered.map(t => {
+        const escapedTitle = t.title.replace(/'/g, "\\'");
+        return `
+        <div class="p-4 rounded-2xl bg-slate-900/80 border ${t.completed ? 'border-slate-800 opacity-60' : 'border-white/10'} transition-all hover:border-white/20">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <button onclick="toggleTask(${t.id})" class="p-1 rounded-lg ${t.completed ? 'bg-rose-500 text-white' : 'border border-slate-600 hover:border-rose-400'}">
+                        <i data-lucide="${t.completed ? 'check-square' : 'square'}" class="w-5 h-5"></i>
+                    </button>
+                    <div>
+                        <p class="text-sm font-semibold text-white ${t.completed ? 'line-through text-slate-500' : ''}">${t.title}</p>
+                        <span class="text-xs text-slate-400">${t.category}</span>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-3">
+                    ${priorityBadges[t.priority]}
+                    <button onclick="deleteTask(${t.id})" class="text-slate-500 hover:text-red-400 p-1">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
                 </div>
             </div>
-            <div class="flex items-center space-x-3">
-                ${priorityBadges[t.priority]}
-                <button onclick="deleteTask(${t.id})" class="text-slate-500 hover:text-red-400 p-1">
-                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+            <div id="ai-steps-${t.id}" class="mt-2 pt-2 border-t border-white/5">
+                <button onclick="fetchAiMicroSteps('${escapedTitle}', 'ai-steps-${t.id}')" class="text-xs text-teal-400 hover:text-teal-300 font-medium flex items-center gap-1.5 transition-colors">
+                    <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                    <span>Generate BloomAI Micro-Steps</span>
                 </button>
             </div>
         </div>
-    `).join('');
+        `;
+    }).join('');
 
     lucide.createIcons();
 }
@@ -178,11 +229,9 @@ let quoteIndex = 0;
 function rotateQuotes() {
     const quoteEl = document.getElementById('inspirational-quote');
     const sourceEl = document.getElementById('quote-source');
-    
     if (!quoteEl || !sourceEl) return;
 
     quoteEl.style.opacity = '0';
-    
     setTimeout(() => {
         quoteIndex = (quoteIndex + 1) % quotes.length;
         quoteEl.innerText = quotes[quoteIndex].text;
@@ -301,13 +350,13 @@ function switchCategory(cat) {
     `).join('');
 }
 
-// EXPLORE BLOOM AI CHATBOT INTERACTION
+// --- EXPLORE BLOOM AI CHATBOT (POWERED BY GEMINI EDGE FUNCTION) ---
 function sendQuickPrompt(promptText) {
     document.getElementById('chat-input').value = promptText;
     handleSendMessage(new Event('submit'));
 }
 
-function handleSendMessage(e) {
+async function handleSendMessage(e) {
     e.preventDefault();
     const input = document.getElementById('chat-input');
     const text = input.value.trim();
@@ -326,60 +375,79 @@ function handleSendMessage(e) {
     input.value = '';
     chatContainer.scrollTop = chatContainer.scrollHeight;
 
-    setTimeout(() => {
-        let aiReply = "I hear you. Balancing everything right now sounds tough, but taking things one step at a time makes a huge difference. You're doing better than you think!";
-        
-        if (text.toLowerCase().includes('exhausted') || text.toLowerCase().includes('job')) {
-            aiReply = "Balancing school assignments with long work hours is exhausting. Make sure to schedule at least 15 uninterrupted minutes for yourself tonight without any screens or tasks.";
-        } else if (text.toLowerCase().includes('understand')) {
-            aiReply = "It's really hard when adults give advice that feels disconnected from your daily reality. Remember, your struggles are valid, and you have full control over how you build your future step by step.";
-        }
+    const typingId = 'typing-' + Date.now();
+    const typingHtml = `
+        <div id="${typingId}" class="flex items-start space-x-3">
+            <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300">
+                <i data-lucide="flower-2" class="w-4 h-4 animate-spin"></i>
+            </div>
+            <div class="bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none text-slate-400 text-sm">
+                Bloom is thinking...
+            </div>
+        </div>
+    `;
+    chatContainer.insertAdjacentHTML('beforeend', typingHtml);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+    lucide.createIcons();
+
+    try {
+        const systemPrompt = `You are Bloom, a warm, empathetic, and modern AI companion for teenagers and young adults navigating school, jobs, and mental health. Keep responses concise, supportive, and practical.\n\nUser says: ${text}`;
+
+        const { data, error } = await supabaseClient.functions.invoke('gemini-proxy', {
+            body: { prompt: systemPrompt }
+        });
+
+        document.getElementById(typingId)?.remove();
+
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error.message || JSON.stringify(data.error));
+
+        const aiReply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "I'm right here with you. Take a deep breath!";
 
         const aiMsgHtml = `
             <div class="flex items-start space-x-3">
                 <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300">
                     <i data-lucide="flower-2" class="w-4 h-4"></i>
                 </div>
-                <div class="bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 text-sm leading-relaxed">
+                <div class="bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 text-sm leading-relaxed whitespace-pre-line">
                     ${aiReply}
                 </div>
             </div>
         `;
         chatContainer.insertAdjacentHTML('beforeend', aiMsgHtml);
-        chatContainer.scrollTop = chatContainer.scrollHeight;
-        lucide.createIcons();
-    }, 800);
+    } catch (err) {
+        document.getElementById(typingId)?.remove();
+        console.error("AI Chat Error:", err);
+        const errorMsgHtml = `
+            <div class="flex items-start space-x-3">
+                <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300">
+                    <i data-lucide="alert-circle" class="w-4 h-4"></i>
+                </div>
+                <div class="bg-slate-800/80 border border-rose-500/30 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-rose-200 text-sm leading-relaxed">
+                    Connection error: ${err.message}
+                </div>
+            </div>
+        `;
+        chatContainer.insertAdjacentHTML('beforeend', errorMsgHtml);
+    }
+
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+    lucide.createIcons();
 }
 
 // --- SUPABASE AUTHENTICATION LOGIC ---
 let isSignUpMode = false;
 
-/*function toggleAuthMode() {
-    isSignUpMode = !isSignUpMode;
-    document.getElementById('auth-title').innerText = isSignUpMode ? 'Create Account' : 'Welcome Back';
-    document.getElementById('auth-subtitle').innerText = isSignUpMode 
-        ? 'Join Bloom to organize your focus and peace of mind.' 
-        : 'Sign in to sync your tasks and Bloom AI chats.';
-    document.getElementById('auth-submit-btn').innerText = isSignUpMode ? 'Sign Up' : 'Sign In';
-    document.getElementById('auth-toggle-btn').innerHTML = isSignUpMode 
-        ? 'Already have an account? <span class="font-bold text-white">Sign In</span>' 
-        : "Don't have an account? <span class=\"font-bold text-white">Sign Up</span>";
-    document.getElementById('auth-error').classList.add('hidden');
-}*/
-
 function toggleAuthMode() {
     isSignUpMode = !isSignUpMode;
-    document.getElementById('auth-title').innerText = isSignUpMode ? 'Create Account': 'Welcome Back';
-    document.getElementById('auth-subtitle').innerText = isSignUpMode 
-        ? 'Join Bloom to organize your focus and peace of mind.' 
+    document.getElementById('auth-title').innerText = isSignUpMode ? 'Create Account' : 'Welcome Back';
+    document.getElementById('auth-subtitle').innerText = isSignUpMode
+        ? 'Join Bloom to organize your focus and peace of mind.'
         : 'Sign in to sync your tasks and Bloom AI chats.';
-    document.getElementById('auth-submit-btn').innerText = isSignUpMode ? 'Sign Up': 'Sign In';
-    
-    // FIX: Use double quotes outside, or escape the single quote with \'
-    document.getElementById('auth-toggle-btn').innerHTML = isSignUpMode 
-        ? 'Already have an account? <span class="font-bold text-white">Sign In</span>' 
+    document.getElementById('auth-submit-btn').innerText = isSignUpMode ? 'Sign Up' : 'Sign In';
+    document.getElementById('auth-toggle-btn').innerHTML = isSignUpMode
+        ? 'Already have an account? <span class="font-bold text-white">Sign In</span>'
         : "Don't have an account? <span class=\"font-bold text-white\">Sign Up</span>";
-        
     document.getElementById('auth-error').classList.add('hidden');
 }
 
@@ -439,7 +507,7 @@ function updateAuthUI(user) {
 
 // INITIALIZATION ON DOM LOAD
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("Bloom application initialized with Supabase.");
+    console.log("Bloom application initialized with Supabase & Gemini AI.");
     lucide.createIcons();
     fetchTasks();
     switchCategory('career');

@@ -1,10 +1,7 @@
 // BLOOM APPLICATION SCRIPT (2026 EDITION - SUPABASE & GEMINI EDGE FUNCTION INTEGRATED)
 
-// SUPABASE CONFIGURATION
 const SUPABASE_URL = 'https://xmqmrkqyjnbupyalhnib.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_7AqK322TINFq1y39lMgvTw_Z7Itc79G';
-
-// Initialize Supabase Client
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // --- TASK MANAGEMENT WITH SUPABASE ---
@@ -16,7 +13,7 @@ async function fetchTasks() {
         .from('tasks')
         .select('*')
         .order('created_at', { ascending: false });
-    
+
     if (error) {
         console.error('Error fetching tasks:', error);
         return;
@@ -115,15 +112,14 @@ async function fetchAiMicroSteps(taskTitle, elementId) {
         });
 
         if (error) throw error;
+        if (data?.error) throw new Error(data.error.message || JSON.stringify(data.error));
 
-        const stepsText = data.candidates?.[0]?.content?.parts?.[0]?.text || "1. Review task details and requirements.
-2. Break it into smaller 10-minute blocks.
-3. Complete the very first small action.";
-        const escapedTitle = taskTitle.replace(/'/g, "\'");
+        const stepsText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "1. Review task details and requirements.\n2. Break it into smaller 10-minute blocks.\n3. Complete the very first small action.";
+        const escapedTitle = taskTitle.replace(/'/g, "\\'");
 
         container.innerHTML = `
             <div class="mt-3 p-3.5 rounded-xl bg-slate-950/90 border border-teal-500/30 text-xs space-y-2 shadow-inner">
-                <div class="flex items-center justify-between">
+                <div class="flex items-center justify-between flex-wrap gap-2">
                     <div class="flex items-center gap-2">
                         <span class="text-teal-400 font-bold flex items-center gap-1">
                             <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
@@ -141,10 +137,10 @@ async function fetchAiMicroSteps(taskTitle, elementId) {
         `;
     } catch (err) {
         console.error("Micro-steps error:", err);
-        const escapedTitle = taskTitle.replace(/'/g, "\'");
+        const escapedTitle = taskTitle.replace(/'/g, "\\'");
         container.innerHTML = `
             <div class="mt-2 flex items-center justify-between text-xs text-rose-400">
-                <span>Could not load AI steps. Make sure your Supabase Edge Function is deployed.</span>
+                <span>AI Error: ${err.message}</span>
                 <button onclick="fetchAiMicroSteps('${escapedTitle}', '${elementId}')" class="underline hover:text-rose-300">Retry</button>
             </div>
         `;
@@ -163,7 +159,7 @@ function renderTasks() {
 
     const completedCount = tasks.filter(t => t.completed).length;
     const progressPct = tasks.length ? Math.round((completedCount / tasks.length) * 100) : 0;
-    
+
     const progressBar = document.getElementById('task-progress-bar');
     const progressText = document.getElementById('task-progress-text');
     if (progressBar) progressBar.style.width = `${progressPct}%`;
@@ -185,7 +181,7 @@ function renderTasks() {
     };
 
     container.innerHTML = filtered.map(t => {
-        const escapedTitle = t.title.replace(/'/g, "\'");
+        const escapedTitle = t.title.replace(/'/g, "\\'");
         return `
         <div class="p-4 rounded-2xl bg-slate-900/80 border ${t.completed ? 'border-slate-800 opacity-60' : 'border-white/10'} transition-all hover:border-white/20">
             <div class="flex items-center justify-between">
@@ -233,11 +229,9 @@ let quoteIndex = 0;
 function rotateQuotes() {
     const quoteEl = document.getElementById('inspirational-quote');
     const sourceEl = document.getElementById('quote-source');
-    
     if (!quoteEl || !sourceEl) return;
 
     quoteEl.style.opacity = '0';
-    
     setTimeout(() => {
         quoteIndex = (quoteIndex + 1) % quotes.length;
         quoteEl.innerText = quotes[quoteIndex].text;
@@ -370,7 +364,6 @@ async function handleSendMessage(e) {
 
     const chatContainer = document.getElementById('chat-messages');
 
-    // Display user message
     const userMsgHtml = `
         <div class="flex items-start justify-end space-x-3">
             <div class="bg-rose-600 text-white p-4 rounded-2xl rounded-tr-none max-w-[85%] text-sm leading-relaxed shadow-md">
@@ -382,7 +375,6 @@ async function handleSendMessage(e) {
     input.value = '';
     chatContainer.scrollTop = chatContainer.scrollHeight;
 
-    // Show temporary typing indicator
     const typingId = 'typing-' + Date.now();
     const typingHtml = `
         <div id="${typingId}" class="flex items-start space-x-3">
@@ -399,9 +391,7 @@ async function handleSendMessage(e) {
     lucide.createIcons();
 
     try {
-        const systemPrompt = "You are Bloom, a warm, empathetic, and modern AI companion for teenagers and young adults navigating school, jobs, and mental health. Keep responses concise, supportive, and practical.
-
-User says: " + text;
+        const systemPrompt = `You are Bloom, a warm, empathetic, and modern AI companion for teenagers and young adults navigating school, jobs, and mental health. Keep responses concise, supportive, and practical.\n\nUser says: ${text}`;
 
         const { data, error } = await supabaseClient.functions.invoke('gemini-proxy', {
             body: { prompt: systemPrompt }
@@ -410,8 +400,9 @@ User says: " + text;
         document.getElementById(typingId)?.remove();
 
         if (error) throw error;
+        if (data?.error) throw new Error(data.error.message || JSON.stringify(data.error));
 
-        const aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "I'm right here with you. Take a deep breath!";
+        const aiReply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "I'm right here with you. Take a deep breath!";
 
         const aiMsgHtml = `
             <div class="flex items-start space-x-3">
@@ -433,7 +424,7 @@ User says: " + text;
                     <i data-lucide="alert-circle" class="w-4 h-4"></i>
                 </div>
                 <div class="bg-slate-800/80 border border-rose-500/30 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-rose-200 text-sm leading-relaxed">
-                    I had trouble connecting to my AI brain. Please double-check that your 'gemini-proxy' Edge Function and GEMINI_API_KEY secret are deployed in Supabase!
+                    Connection error: ${err.message}
                 </div>
             </div>
         `;
@@ -450,13 +441,13 @@ let isSignUpMode = false;
 function toggleAuthMode() {
     isSignUpMode = !isSignUpMode;
     document.getElementById('auth-title').innerText = isSignUpMode ? 'Create Account' : 'Welcome Back';
-    document.getElementById('auth-subtitle').innerText = isSignUpMode 
-        ? 'Join Bloom to organize your focus and peace of mind.' 
+    document.getElementById('auth-subtitle').innerText = isSignUpMode
+        ? 'Join Bloom to organize your focus and peace of mind.'
         : 'Sign in to sync your tasks and Bloom AI chats.';
     document.getElementById('auth-submit-btn').innerText = isSignUpMode ? 'Sign Up' : 'Sign In';
-    document.getElementById('auth-toggle-btn').innerHTML = isSignUpMode 
-        ? 'Already have an account? <span class="font-bold text-white">Sign In</span>' 
-        : "Don't have an account? <span class="font-bold text-white">Sign Up</span>";
+    document.getElementById('auth-toggle-btn').innerHTML = isSignUpMode
+        ? 'Already have an account? <span class="font-bold text-white">Sign In</span>'
+        : "Don't have an account? <span class=\"font-bold text-white\">Sign Up</span>";
     document.getElementById('auth-error').classList.add('hidden');
 }
 

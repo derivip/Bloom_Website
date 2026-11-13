@@ -156,7 +156,7 @@
                         <i data-lucide="compass" class="w-6 h-6"></i>
                     </div>
                     <h3 class="text-xl font-bold text-white mb-2">Real Advice Library</h3>
-                    <p class="text-slate-400 text-sm leading-relaxed">Modern guidebooks on managing school, jobs, mental exhaustion, and personal relationships.</p>
+                    <p class="text-slate-400 text-sm leading-relaxed">Modern Library of Youth Focused Supportive Content</p>
                 </div>
 
                 <div onclick="switchTab('chat')" class="cursor-pointer group p-6 rounded-2xl bg-slate-900/50 border border-white/10 hover:border-indigo-500/50 transition-all hover:scale-[1.02] shadow-xl">
@@ -212,6 +212,7 @@
                                 <option value="School">School & Studies</option>
                                 <option value="Job">Work & Job Shift</option>
                                 <option value="Personal">Personal & Well-being</option>
+                
                             </select>
                         </div>
                         <button type="submit" class="w-full bg-gradient-to-r from-rose-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:opacity-90 transition-opacity flex justify-center items-center space-x-2 shadow-md shadow-rose-500/20">
@@ -288,10 +289,10 @@
 
                 <div class="flex gap-2 overflow-x-auto pb-3 text-xs">
                     <button onclick="sendQuickPrompt('I feel exhausted balancing school and my job.')" class="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:border-rose-500 text-slate-300 whitespace-nowrap transition-colors">
-                        😫 Balancing school & job
+                        😫 How to Balance My Workload
                     </button>
                     <button onclick="sendQuickPrompt('I feel like no adults understand what I go through.')" class="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:border-rose-500 text-slate-300 whitespace-nowrap transition-colors">
-                        🗣️ Nobody understands me
+                        🗣️ Finding Trusted Adults
                     </button>
                     <button onclick="sendQuickPrompt('Give me a quick 2-minute tip to stop procrastinating.')" class="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:border-rose-500 text-slate-300 whitespace-nowrap transition-colors">
                         ⚡ Quick anti-procrastination tip
@@ -317,12 +318,11 @@
     <!-- EXTERNAL JS -->
     <script src="script.js"></script>
 
-    <!-- FLOATING AD-FREE FOCUS AUDIO PLAYER -->
+  <!-- FLOATING AD-FREE FOCUS AUDIO PLAYER -->
 <div class="fixed bottom-20 md:bottom-6 right-6 z-40 bg-slate-900/90 border border-white/15 backdrop-blur-xl px-4 py-2.5 rounded-full shadow-2xl flex items-center space-x-3 transition-all hover:border-rose-500/40">
-    <!-- Hidden Native HTML5 Audio Element -->
-    <audio id="bg-audio" loop preload="none">
-        <!-- Ad-free public 24/7 Chillhop / Lo-Fi stream -->
-        <source id="bg-audio-source" src="https://streams.fluxfm.de/Chillhop/mp3-128/streams.fluxfm.de/" type="audio/mpeg">
+    <!-- Native HTML5 Audio Element -->
+    <audio id="bg-audio" preload="none" onerror="handleAudioError()">
+        <source id="bg-audio-source" src="https://channels.fluxfm.de/chillhop/externalembedflxhp/stream.mp3" type="audio/mpeg">
     </audio>
 
     <button onclick="toggleMusic()" id="music-toggle-btn" class="p-2 rounded-full bg-gradient-to-r from-rose-500 to-purple-600 text-white shadow-md hover:scale-105 transition-transform" title="Play / Pause Focus Music">
@@ -332,8 +332,8 @@
     <div class="flex flex-col pr-1">
         <span class="text-[11px] font-bold text-white leading-tight">Focus Radio</span>
         <select id="music-station" onchange="changeStation()" class="bg-transparent text-[10px] text-rose-300 font-medium focus:outline-none cursor-pointer">
-            <option value="https://streams.fluxfm.de/Chillhop/mp3-128/streams.fluxfm.de/" class="bg-slate-900 text-white">🎧 24/7 Lo-Fi Beats</option>
-            <option value="https://cast1.torontocast.com:2120/stream" class="bg-slate-900 text-white">🎹 Soft Solo Piano</option>
+            <option value="https://channels.fluxfm.de/chillhop/externalembedflxhp/stream.mp3" class="bg-slate-900 text-white">🎧 24/7 Lo-Fi Beats</option>
+            <option value="https://stream.klassikradio.de/piano/mp3-192/www.klassikradio" class="bg-slate-900 text-white">🎹 Soft Solo Piano</option>
         </select>
     </div>
 

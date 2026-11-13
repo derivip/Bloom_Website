@@ -520,4 +520,49 @@ document.addEventListener('DOMContentLoaded', () => {
     supabaseClient.auth.getSession().then(({ data: { session } }) => {
         updateAuthUI(session?.user || null);
     });
+    
 });
+// --- AD-FREE BACKGROUND FOCUS MUSIC PLAYER ---
+let isMusicPlaying = false;
+
+function toggleMusic() {
+    const audio = document.getElementById('bg-audio');
+    const icon = document.getElementById('music-icon');
+    if (!audio || !icon) return;
+
+    if (isMusicPlaying) {
+        audio.pause();
+        isMusicPlaying = false;
+        icon.setAttribute('data-lucide', 'play');
+    } else {
+        audio.volume = document.getElementById('music-volume')?.value || 0.4;
+        audio.play().then(() => {
+            isMusicPlaying = true;
+            icon.setAttribute('data-lucide', 'pause');
+            lucide.createIcons();
+        }).catch(err => {
+            console.error("Audio playback error:", err);
+            alert("Could not connect to the radio stream right now. Try switching stations!");
+        });
+    }
+    lucide.createIcons();
+}
+
+function changeStation() {
+    const audio = document.getElementById('bg-audio');
+    const source = document.getElementById('bg-audio-source');
+    const stationSelect = document.getElementById('music-station');
+    if (!audio || !source || !stationSelect) return;
+
+    source.src = stationSelect.value;
+    audio.load();
+
+    if (isMusicPlaying) {
+        audio.play().catch(err => console.error("Stream switch error:", err));
+    }
+}
+
+function setMusicVolume(val) {
+    const audio = document.getElementById('bg-audio');
+    if (audio) audio.volume = val;
+}

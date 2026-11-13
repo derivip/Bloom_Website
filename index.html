@@ -50,42 +50,60 @@
     <!-- MAIN CONTENT CONTAINERS -->
     <main class="flex-grow max-w-7xl w-full mx-auto p-4 md:p-8">
 
-        <!-- 0. AUTHENTICATION VIEW (LOGIN / SIGN UP) -->
-        <section id="view-auth" class="hidden flex items-center justify-center min-h-[70vh]">
-            <div class="w-full max-w-md bg-slate-900/90 border border-white/10 p-8 rounded-3xl shadow-2xl space-y-6 backdrop-blur-xl">
-                <div class="text-center space-y-2">
-                    <div class="mx-auto w-12 h-12 rounded-full bg-gradient-to-tr from-rose-500 via-purple-500 to-indigo-500 flex items-center justify-center shadow-lg shadow-rose-500/20">
-                        <i data-lucide="lock" class="w-6 h-6 text-white"></i>
-                    </div>
-                    <h2 id="auth-title" class="text-2xl font-extrabold text-white">Welcome Back</h2>
-                    <p id="auth-subtitle" class="text-xs text-slate-400">Sign in to sync your tasks and Bloom AI chats.</p>
-                </div>
-
-                <form id="auth-form" onsubmit="handleAuthSubmit(event)" class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-medium text-slate-400 mb-1">Email Address</label>
-                        <input type="email" id="auth-email" required placeholder="you@example.com" class="w-full bg-slate-950 border border-white/15 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-rose-500 transition-colors">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-400 mb-1">Password</label>
-                        <input type="password" id="auth-password" required placeholder="••••••••" minlength="6" class="w-full bg-slate-950 border border-white/15 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-rose-500 transition-colors">
-                    </div>
-
-                    <div id="auth-error" class="hidden text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 p-3 rounded-xl"></div>
-
-                    <button type="submit" id="auth-submit-btn" class="w-full bg-gradient-to-r from-rose-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:opacity-90 transition-opacity shadow-md shadow-rose-500/20">
-                        Sign In
-                    </button>
-                </form>
-
-                <div class="text-center pt-2 border-t border-white/10">
-                    <button type="button" onclick="toggleAuthMode()" id="auth-toggle-btn" class="text-xs text-slate-400 hover:text-rose-400 transition-colors">
-                        Don't have an account? <span class="font-bold text-white">Sign Up</span>
-                    </button>
-                </div>
+      <!-- 0. AUTHENTICATION VIEW (LOGIN / SIGN UP / PASSWORD RESET) -->
+<section id="view-auth" class="hidden flex items-center justify-center min-h-[70vh]">
+    <div class="w-full max-w-md bg-slate-900/90 border border-white/10 p-8 rounded-3xl shadow-2xl space-y-6 backdrop-blur-xl">
+        <div class="text-center space-y-2">
+            <div class="mx-auto w-12 h-12 rounded-full bg-gradient-to-tr from-rose-500 via-purple-500 to-indigo-500 flex items-center justify-center shadow-lg shadow-rose-500/20">
+                <i data-lucide="lock" class="w-6 h-6 text-white"></i>
             </div>
-        </section>
+            <h2 id="auth-title" class="text-2xl font-extrabold text-white">Welcome Back</h2>
+            <p id="auth-subtitle" class="text-xs text-slate-400">Sign in to sync your tasks and Bloom AI chats.</p>
+        </div>
 
+        <!-- STANDARD LOGIN / SIGN UP FORM -->
+        <form id="auth-form" onsubmit="handleAuthSubmit(event)" class="space-y-4">
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Email Address</label>
+                <input type="email" id="auth-email" required placeholder="you@example.com" class="w-full bg-slate-950 border border-white/15 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-rose-500 transition-colors">
+            </div>
+            <div>
+                <div class="flex items-center justify-between mb-1">
+                    <label class="block text-xs font-medium text-slate-400">Password</label>
+                    <button type="button" id="forgot-pwd-link" onclick="handleForgotPassword()" class="text-[11px] text-rose-400 hover:text-rose-300 transition-colors">
+                        Forgot password?
+                    </button>
+                </div>
+                <input type="password" id="auth-password" required placeholder="••••••••" minlength="6" class="w-full bg-slate-950 border border-white/15 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-rose-500 transition-colors">
+            </div>
+
+            <div id="auth-error" class="hidden text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 p-3 rounded-xl"></div>
+            <div id="auth-success" class="hidden text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl"></div>
+
+            <button type="submit" id="auth-submit-btn" class="w-full bg-gradient-to-r from-rose-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:opacity-90 transition-opacity shadow-md shadow-rose-500/20">
+                Sign In
+            </button>
+        </form>
+
+        <!-- NEW PASSWORD FORM (SHOWN ONLY AFTER CLICKING EMAIL RESET LINK) -->
+        <form id="reset-password-form" onsubmit="handleUpdatePassword(event)" class="hidden space-y-4">
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">New Password</label>
+                <input type="password" id="new-password" required placeholder="Enter new password (min 6 chars)" minlength="6" class="w-full bg-slate-950 border border-white/15 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-rose-500 transition-colors">
+            </div>
+            <div id="reset-error" class="hidden text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 p-3 rounded-xl"></div>
+            <button type="submit" id="reset-submit-btn" class="w-full bg-gradient-to-r from-rose-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:opacity-90 transition-opacity shadow-md shadow-rose-500/20">
+                Save New Password
+            </button>
+        </form>
+
+        <div id="auth-footer-toggle" class="text-center pt-2 border-t border-white/10">
+            <button type="button" onclick="toggleAuthMode()" id="auth-toggle-btn" class="text-xs text-slate-400 hover:text-rose-400 transition-colors">
+                Don't have an account? <span class="font-bold text-white">Sign Up</span>
+            </button>
+        </div>
+    </div>
+</section>
         <!-- 1. HOME VIEW / HERO -->
         <section id="view-home" class="space-y-12 transition-all duration-500">
             <div class="animated-gradient-hero relative overflow-hidden rounded-3xl p-8 md:p-16 border border-white/10 shadow-2xl flex flex-col justify-center items-center text-center min-h-[460px]">
@@ -251,7 +269,7 @@
                             <h2 class="font-bold text-white text-lg leading-tight">Explore Bloom AI Companion</h2>
                             <p class="text-xs text-rose-400 flex items-center space-x-1">
                                 <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block"></span>
-                                <span>Always online • Active listener</span>
+                                <span>Powered by Gemini • Active listener</span>
                             </p>
                         </div>
                     </div>

@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bloom - Mindful Focus & Youth Guidance</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans flex flex-col justify-between selection:bg-rose-500 selection:text-white">
+
+    <!-- NAVIGATION BAR -->
+    <header class="sticky top-0 z-50 backdrop-blur-md bg-slate-950/75 border-b border-white/10 px-6 py-4 flex items-center justify-between transition-all">
+        <div class="flex items-center space-x-3 cursor-pointer" onclick="switchTab('home')">
+            <div class="p-2 rounded-full bg-gradient-to-tr from-rose-500 via-purple-500 to-indigo-500 shadow-lg shadow-rose-500/20">
+                <i data-lucide="flower-2" class="w-6 h-6 text-white animate-spin-slow"></i>
+            </div>
+            <span class="text-2xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-rose-400 via-purple-300 to-indigo-300">Bloom</span>
+        </div>
+
+        <nav class="hidden md:flex items-center space-x-1 bg-white/5 border border-white/10 p-1.5 rounded-full backdrop-blur-lg">
+            <button onclick="switchTab('home')" id="nav-home" class="nav-btn px-5 py-2 rounded-full text-sm font-semibold transition-all duration-300 bg-white/15 text-white shadow-sm">Home</button>
+            <button onclick="switchTab('tasks')" id="nav-tasks" class="nav-btn px-5 py-2 rounded-full text-sm font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all duration-300">Focus Hub</button>
+            <button onclick="switchTab('learn')" id="nav-learn" class="nav-btn px-5 py-2 rounded-full text-sm font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all duration-300">Guidance Library</button>
+            <button onclick="switchTab('chat')" id="nav-chat" class="nav-btn px-5 py-2 rounded-full text-sm font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all duration-300 flex items-center space-x-2">
+                <span>Explore Bloom AI</span>
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">24/7</span>
+            </button>
+        </nav>
+
+        <div class="flex items-center space-x-3">
+            <button id="auth-nav-btn" onclick="switchTab('auth')" class="px-5 py-2 text-xs font-semibold rounded-full bg-gradient-to-r from-rose-500 to-purple-600 hover:from-rose-600 hover:to-purple-700 text-white shadow-md shadow-purple-500/25 transition-all duration-300 hover:scale-105 flex items-center space-x-2">
+                <i data-lucide="log-in" class="w-4 h-4"></i>
+                <span>Log In</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- MOBILE NAVIGATION BAR -->
+    <div class="md:hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-slate-900/90 border border-white/15 backdrop-blur-xl px-4 py-2 rounded-full flex space-x-4 shadow-2xl">
+        <button onclick="switchTab('home')" id="mnav-home" class="p-2 text-rose-400"><i data-lucide="home" class="w-5 h-5"></i></button>
+        <button onclick="switchTab('tasks')" id="mnav-tasks" class="p-2 text-slate-400"><i data-lucide="check-square" class="w-5 h-5"></i></button>
+        <button onclick="switchTab('learn')" id="mnav-learn" class="p-2 text-slate-400"><i data-lucide="book-open" class="w-5 h-5"></i></button>
+        <button onclick="switchTab('chat')" id="mnav-chat" class="p-2 text-slate-400"><i data-lucide="bot" class="w-5 h-5"></i></button>
+        <button onclick="switchTab('auth')" id="mnav-auth" class="p-2 text-slate-400"><i data-lucide="log-in" class="w-5 h-5"></i></button>
+    </div>
+
+    <!-- MAIN CONTENT CONTAINERS -->
+    <main class="flex-grow max-w-7xl w-full mx-auto p-4 md:p-8">
+
+        <!-- 0. AUTHENTICATION VIEW (LOGIN / SIGN UP) -->
+        <section id="view-auth" class="hidden flex items-center justify-center min-h-[70vh]">
+            <div class="w-full max-w-md bg-slate-900/90 border border-white/10 p-8 rounded-3xl shadow-2xl space-y-6 backdrop-blur-xl">
+                <div class="text-center space-y-2">
+                    <div class="mx-auto w-12 h-12 rounded-full bg-gradient-to-tr from-rose-500 via-purple-500 to-indigo-500 flex items-center justify-center shadow-lg shadow-rose-500/20">
+                        <i data-lucide="lock" class="w-6 h-6 text-white"></i>
+                    </div>
+                    <h2 id="auth-title" class="text-2xl font-extrabold text-white">Welcome Back</h2>
+                    <p id="auth-subtitle" class="text-xs text-slate-400">Sign in to sync your tasks and Bloom AI chats.</p>
+                </div>
+
+                <form id="auth-form" onsubmit="handleAuthSubmit(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Email Address</label>
+                        <input type="email" id="auth-email" required placeholder="you@example.com" class="w-full bg-slate-950 border border-white/15 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-rose-500 transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Password</label>
+                        <input type="password" id="auth-password" required placeholder="••••••••" minlength="6" class="w-full bg-slate-950 border border-white/15 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-rose-500 transition-colors">
+                    </div>
+
+                    <div id="auth-error" class="hidden text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 p-3 rounded-xl"></div>
+
+                    <button type="submit" id="auth-submit-btn" class="w-full bg-gradient-to-r from-rose-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:opacity-90 transition-opacity shadow-md shadow-rose-500/20">
+                        Sign In
+                    </button>
+                </form>
+
+                <div class="text-center pt-2 border-t border-white/10">
+                    <button type="button" onclick="toggleAuthMode()" id="auth-toggle-btn" class="text-xs text-slate-400 hover:text-rose-400 transition-colors">
+                        Don't have an account? <span class="font-bold text-white">Sign Up</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 1. HOME VIEW / HERO -->
+        <section id="view-home" class="space-y-12 transition-all duration-500">
+            <div class="animated-gradient-hero relative overflow-hidden rounded-3xl p-8 md:p-16 border border-white/10 shadow-2xl flex flex-col justify-center items-center text-center min-h-[460px]">
+                <div class="absolute inset-0 bg-black/30 backdrop-blur-[2px]"></div>
+                
+                <div class="relative z-10 space-y-6 max-w-3xl">
+                    <div class="inline-flex items-center space-x-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-xs font-medium tracking-wide text-rose-200">
+                        <i data-lucide="sparkles" class="w-4 h-4 text-rose-300 animate-pulse"></i>
+                        <span>A Space Designed for Your Peace & Growth</span>
+                    </div>
+
+                    <div class="min-h-[140px] flex items-center justify-center">
+                        <blockquote id="inspirational-quote" class="text-2xl md:text-4xl font-extrabold text-white tracking-tight leading-tight transition-opacity duration-500 drop-shadow-md">
+                            "It’s not about having time, it’s about making time."
+                        </blockquote>
+                    </div>
+
+                    <div id="quote-source" class="text-xs font-semibold uppercase tracking-widest text-slate-300/80">
+                        — Captain America (Avengers: Endgame)
+                    </div>
+
+                    <div class="pt-6 flex flex-wrap justify-center gap-4">
+                        <button onclick="switchTab('tasks')" class="px-6 py-3 rounded-full bg-white text-slate-950 font-bold hover:bg-slate-200 transition-all shadow-lg flex items-center space-x-2">
+                            <span>Organize Your Day</span>
+                            <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                        </button>
+                        <button onclick="switchTab('chat')" class="px-6 py-3 rounded-full bg-white/10 hover:bg-white/20 text-white font-semibold backdrop-blur-md border border-white/20 transition-all flex items-center space-x-2">
+                            <i data-lucide="message-square" class="w-4 h-4"></i>
+                            <span>Explore Bloom AI</span>
+                        </button>
+                        <button onclick="switchTab('auth')" class="px-6 py-3 rounded-full bg-gradient-to-r from-rose-500 to-purple-600 hover:opacity-95 text-white font-semibold shadow-lg flex items-center space-x-2">
+                            <i data-lucide="log-in" class="w-4 h-4"></i>
+                            <span>Log In / Sign Up</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div onclick="switchTab('tasks')" class="cursor-pointer group p-6 rounded-2xl bg-slate-900/50 border border-white/10 hover:border-rose-500/50 transition-all hover:scale-[1.02] shadow-xl">
+                    <div class="p-3 w-max rounded-xl bg-rose-500/10 text-rose-400 mb-4 group-hover:scale-110 transition-transform">
+                        <i data-lucide="list-todo" class="w-6 h-6"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-2">Priority Task Hub</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">Break down overwhelming workloads into simple High, Medium, and Low priority steps.</p>
+                </div>
+
+                <div onclick="switchTab('learn')" class="cursor-pointer group p-6 rounded-2xl bg-slate-900/50 border border-white/10 hover:border-purple-500/50 transition-all hover:scale-[1.02] shadow-xl">
+                    <div class="p-3 w-max rounded-xl bg-purple-500/10 text-purple-400 mb-4 group-hover:scale-110 transition-transform">
+                        <i data-lucide="compass" class="w-6 h-6"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-2">Real Advice Library</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">Modern guidebooks on managing school, jobs, mental exhaustion, and personal relationships.</p>
+                </div>
+
+                <div onclick="switchTab('chat')" class="cursor-pointer group p-6 rounded-2xl bg-slate-900/50 border border-white/10 hover:border-indigo-500/50 transition-all hover:scale-[1.02] shadow-xl">
+                    <div class="p-3 w-max rounded-xl bg-indigo-500/10 text-indigo-400 mb-4 group-hover:scale-110 transition-transform">
+                        <i data-lucide="bot" class="w-6 h-6"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-2">24/7 Explore Bloom AI</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">Get anytime support using Explore Bloom AI that's powered by Gemini!</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. TASK DASHBOARD VIEW -->
+        <section id="view-tasks" class="hidden space-y-8">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-6">
+                <div>
+                    <h1 class="text-3xl font-extrabold text-white tracking-tight">Task Focus Hub</h1>
+                    <p class="text-slate-400 text-sm">Organize homework, work shifts, and personal chores effortlessly.</p>
+                </div>
+                <div class="bg-slate-900 border border-white/10 p-4 rounded-2xl w-full md:w-80">
+                    <div class="flex justify-between text-xs font-semibold mb-2">
+                        <span class="text-slate-400">Completion Rate</span>
+                        <span id="task-progress-text" class="text-rose-400">0%</span>
+                    </div>
+                    <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
+                        <div id="task-progress-bar" class="bg-gradient-to-r from-rose-500 to-indigo-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="lg:col-span-1 bg-slate-900/80 border border-white/10 p-6 rounded-2xl h-fit space-y-4">
+                    <h2 class="text-lg font-bold text-white flex items-center space-x-2">
+                        <i data-lucide="plus-circle" class="w-5 h-5 text-rose-400"></i>
+                        <span>Add New Task</span>
+                    </h2>
+                    <form id="task-form" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Task Title</label>
+                            <input type="text" id="task-title" required placeholder="e.g. Finish Physics Lab Report" class="w-full bg-slate-950 border border-white/15 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-rose-500 transition-colors">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Priority Level</label>
+                            <select id="task-priority" class="w-full bg-slate-950 border border-white/15 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-rose-500 transition-colors">
+                                <option value="high">🔥 High Priority (Urgent)</option>
+                                <option value="medium" selected>⚡ Medium Priority (Important)</option>
+                                <option value="low">🌱 Low Priority (Whenever)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Category</label>
+                            <select id="task-category" class="w-full bg-slate-950 border border-white/15 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-rose-500 transition-colors">
+                                <option value="School">School & Studies</option>
+                                <option value="Job">Work & Job Shift</option>
+                                <option value="Personal">Personal & Well-being</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="w-full bg-gradient-to-r from-rose-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:opacity-90 transition-opacity flex justify-center items-center space-x-2 shadow-md shadow-rose-500/20">
+                            <i data-lucide="plus" class="w-4 h-4"></i>
+                            <span>Create Task</span>
+                        </button>
+                    </form>
+                </div>
+
+                <div class="lg:col-span-2 space-y-4">
+                    <div class="flex items-center justify-between gap-2 overflow-x-auto pb-2">
+                        <div class="flex space-x-2">
+                            <button onclick="filterTasks('all')" id="filter-all" class="filter-btn px-4 py-1.5 rounded-xl text-xs font-medium bg-rose-500/20 border border-rose-500 text-rose-300">All</button>
+                            <button onclick="filterTasks('high')" id="filter-high" class="filter-btn px-4 py-1.5 rounded-xl text-xs font-medium bg-slate-900 border border-white/10 text-slate-400 hover:text-white">High</button>
+                            <button onclick="filterTasks('medium')" id="filter-medium" class="filter-btn px-4 py-1.5 rounded-xl text-xs font-medium bg-slate-900 border border-white/10 text-slate-400 hover:text-white">Medium</button>
+                            <button onclick="filterTasks('low')" id="filter-low" class="filter-btn px-4 py-1.5 rounded-xl text-xs font-medium bg-slate-900 border border-white/10 text-slate-400 hover:text-white">Low</button>
+                        </div>
+                    </div>
+
+                    <div id="tasks-container" class="space-y-3">
+                        <!-- Dynamic Tasks Rendered Here -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. LEARNING & GUIDANCE PLATFORM VIEW -->
+        <section id="view-learn" class="hidden space-y-8">
+            <div class="border-b border-white/10 pb-6">
+                <h1 class="text-3xl font-extrabold text-white tracking-tight">Guidance & Resource Hub</h1>
+                <p class="text-slate-400 text-sm">Actionable advice, de-stressing activities, and modern tips for teen life.</p>
+            </div>
+
+            <div class="flex space-x-3 overflow-x-auto pb-2 border-b border-white/5">
+                <button onclick="switchCategory('career')" id="cat-career" class="cat-btn px-5 py-2.5 rounded-2xl text-sm font-semibold bg-rose-500 text-white shadow-md">💼 Career & School</button>
+                <button onclick="switchCategory('emotional')" id="cat-emotional" class="cat-btn px-5 py-2.5 rounded-2xl text-sm font-semibold bg-slate-900 text-slate-400 hover:text-white">🧠 Emotional & Stress</button>
+                <button onclick="switchCategory('personal')" id="cat-personal" class="cat-btn px-5 py-2.5 rounded-2xl text-sm font-semibold bg-slate-900 text-slate-400 hover:text-white">🌟 Personal Growth</button>
+                <button onclick="switchCategory('destress')" id="cat-destress" class="cat-btn px-5 py-2.5 rounded-2xl text-sm font-semibold bg-slate-900 text-slate-400 hover:text-white">🧘 De-Stress Toolkit</button>
+            </div>
+
+            <div id="learning-content" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Content items populated dynamically via JavaScript -->
+            </div>
+        </section>
+
+        <!-- 4. EXPLORE BLOOM AI CHATBOT VIEW -->
+        <section id="view-chat" class="hidden space-y-4">
+            <div class="bg-slate-900/90 border border-white/10 rounded-3xl p-4 md:p-6 shadow-2xl flex flex-col h-[75vh]">
+                <div class="flex items-center justify-between pb-4 border-b border-white/10">
+                    <div class="flex items-center space-x-3">
+                        <div class="p-2.5 rounded-2xl bg-gradient-to-tr from-rose-500 to-purple-600 text-white shadow-md">
+                            <i data-lucide="bot" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <h2 class="font-bold text-white text-lg leading-tight">Explore Bloom AI Companion</h2>
+                            <p class="text-xs text-rose-400 flex items-center space-x-1">
+                                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block"></span>
+                                <span>Powered by Gemini • Active listener</span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="chat-messages" class="flex-grow overflow-y-auto my-4 space-y-4 pr-2">
+                    <div class="flex items-start space-x-3">
+                        <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300">
+                            <i data-lucide="flower-2" class="w-4 h-4"></i>
+                        </div>
+                        <div class="bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 text-sm leading-relaxed">
+                            Hey there. 👋 I’m Bloom. Whether you’re feeling overwhelmed with school, stressed about work, or just need someone to vent to late at night, I’m right here with you. How are you feeling right now?
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex gap-2 overflow-x-auto pb-3 text-xs">
+                    <button onclick="sendQuickPrompt('I feel exhausted balancing school and my job.')" class="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:border-rose-500 text-slate-300 whitespace-nowrap transition-colors">
+                        😫 Balancing school & job
+                    </button>
+                    <button onclick="sendQuickPrompt('I feel like no adults understand what I go through.')" class="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:border-rose-500 text-slate-300 whitespace-nowrap transition-colors">
+                        🗣️ Nobody understands me
+                    </button>
+                    <button onclick="sendQuickPrompt('Give me a quick 2-minute tip to stop procrastinating.')" class="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:border-rose-500 text-slate-300 whitespace-nowrap transition-colors">
+                        ⚡ Quick anti-procrastination tip
+                    </button>
+                </div>
+
+                <form id="chat-form" onsubmit="handleSendMessage(event)" class="flex space-x-2 pt-2 border-t border-white/10">
+                    <input type="text" id="chat-input" placeholder="Express yourself or ask for advice..." class="flex-grow bg-slate-950 border border-white/15 rounded-2xl px-5 py-3 text-sm text-white focus:outline-none focus:border-rose-500 transition-colors">
+                    <button type="submit" class="px-5 py-3 rounded-2xl bg-gradient-to-r from-rose-500 to-purple-600 hover:from-rose-600 hover:to-purple-700 text-white font-semibold flex items-center justify-center transition-all shadow-lg shadow-purple-500/20">
+                        <i data-lucide="send" class="w-4 h-4"></i>
+                    </button>
+                </form>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="border-t border-white/10 py-6 text-center text-xs text-slate-500">
+        <p>© 2026 Bloom Platform • Empowering Gen-Z Through Thoughtful Design</p>
+    </footer>
+
+    <!-- EXTERNAL JS -->
+    <script src="script.js"></script>
+</body>
+</html>

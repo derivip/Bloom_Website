@@ -316,5 +316,28 @@
 
     <!-- EXTERNAL JS -->
     <script src="script.js"></script>
+
+    <!-- FLOATING AD-FREE FOCUS AUDIO PLAYER -->
+<div class="fixed bottom-20 md:bottom-6 right-6 z-40 bg-slate-900/90 border border-white/15 backdrop-blur-xl px-4 py-2.5 rounded-full shadow-2xl flex items-center space-x-3 transition-all hover:border-rose-500/40">
+    <!-- Hidden Native HTML5 Audio Element -->
+    <audio id="bg-audio" loop preload="none">
+        <!-- Ad-free public 24/7 Chillhop / Lo-Fi stream -->
+        <source id="bg-audio-source" src="https://streams.fluxfm.de/Chillhop/mp3-128/streams.fluxfm.de/" type="audio/mpeg">
+    </audio>
+
+    <button onclick="toggleMusic()" id="music-toggle-btn" class="p-2 rounded-full bg-gradient-to-r from-rose-500 to-purple-600 text-white shadow-md hover:scale-105 transition-transform" title="Play / Pause Focus Music">
+        <i id="music-icon" data-lucide="play" class="w-4 h-4"></i>
+    </button>
+
+    <div class="flex flex-col pr-1">
+        <span class="text-[11px] font-bold text-white leading-tight">Focus Radio</span>
+        <select id="music-station" onchange="changeStation()" class="bg-transparent text-[10px] text-rose-300 font-medium focus:outline-none cursor-pointer">
+            <option value="https://streams.fluxfm.de/Chillhop/mp3-128/streams.fluxfm.de/" class="bg-slate-900 text-white">🎧 24/7 Lo-Fi Beats</option>
+            <option value="https://cast1.torontocast.com:2120/stream" class="bg-slate-900 text-white">🎹 Soft Solo Piano</option>
+        </select>
+    </div>
+
+    <input type="range" id="music-volume" min="0" max="1" step="0.05" value="0.4" oninput="setMusicVolume(this.value)" class="w-16 accent-rose-500 cursor-pointer hidden sm:block" title="Volume">
+</div>
 </body>
 </html>

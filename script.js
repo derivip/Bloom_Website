@@ -1,23 +1,29 @@
-// BLOOM APPLICATION SCRIPT (2026 EDITION - SUPABASE & GEMINI EDGE FUNCTION INTEGRATED)
+// BLOOM APPLICATION SCRIPT (2026 EDITION - SUPABASE, GEMINI AI, AUTH & FOCUS RADIO)
 
+// SUPABASE CONFIGURATION
 const SUPABASE_URL = 'https://xmqmrkqyjnbupyalhnib.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_7AqK322TINFq1y39lMgvTw_Z7Itc79G';
+
+// Initialize Supabase Client
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// --- TASK MANAGEMENT WITH SUPABASE ---
+// --- TASK MANAGEMENT WITH SUPABASE (PER-USER ISOLATED) ---
 let tasks = [];
 let currentFilter = 'all';
 
 async function fetchTasks() {
     const { data: { session } } = await supabaseClient.auth.getSession();
     const container = document.getElementById('tasks-container');
+
     if (!session) {
         tasks = [];
         if (container) {
             container.innerHTML = `
                 <div class="text-center py-12 bg-slate-900/30 rounded-2xl border border-white/5 space-y-3">
                     <p class="text-slate-400 text-sm">Please log in to view and manage your personal tasks.</p>
-                    <button onclick="switchTab('auth')" class="px-4 py-2 rounded-xl bg-rose-500 text-white text-xs font-semibold hover:bg-rose-600 transition-colors">Log In Now</button>
+                    <button onclick="switchTab('auth')" class="px-4 py-2 rounded-xl bg-rose-500 text-white text-xs font-semibold hover:bg-rose-600 transition-colors">
+                        Log In Now
+                    </button>
                 </div>
             `;
         }
@@ -28,21 +34,33 @@ async function fetchTasks() {
         return;
     }
 
-    const { data, error } = await supabaseClient.from('tasks').select('*').order('created_at', { ascending: false });
-    if (error) { console.error('Error fetching tasks:', error); return; }
+    const { data, error } = await supabaseClient
+        .from('tasks')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching tasks:', error);
+        return;
+    }
     tasks = data || [];
     renderTasks();
 }
 
-
-async function: handleAddTask(e) {
+async function handleAddTask(e) {
     e.preventDefault();
+
     const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session) { alert("You must be logged in to create tasks."); switchTab('auth'); return; }
+    if (!session) {
+        alert("You must be logged in to create tasks.");
+        switchTab('auth');
+        return;
+    }
 
     const titleInput = document.getElementById('task-title');
     const priorityInput = document.getElementById('task-priority');
     const categoryInput = document.getElementById('task-category');
+
     if (!titleInput || !priorityInput || !categoryInput) return;
 
     const newTask = {
@@ -53,20 +71,9 @@ async function: handleAddTask(e) {
         user_id: session.user.id
     };
 
-    const { error } = await supabaseClient.from('tasks').insert([newTask]);
-    if (error) { alert("Failed to save task: " + error.message); return; }
-
-    titleInput.value = '';
-    fetchTasks();
-
-    };
-
-   async function handleAddTask(e) {
-    e.preventDefault();
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session) { alert("You must be logged in to create tasks."); switchTab('auth'); return; }
-    // ... rest of your code
-}
+    const { error } = await supabaseClient
+        .from('tasks')
+        .insert([newTask]);
 
     if (error) {
         console.error("Supabase Error:", error.message);
@@ -462,7 +469,7 @@ async function handleSendMessage(e) {
     lucide.createIcons();
 }
 
-// --- SUPABASE AUTHENTICATION LOGIC ---
+// --- SUPABASE AUTHENTICATION & PASSWORD RECOVERY LOGIC ---
 let isSignUpMode = false;
 
 function toggleAuthMode() {
@@ -475,7 +482,73 @@ function toggleAuthMode() {
     document.getElementById('auth-toggle-btn').innerHTML = isSignUpMode
         ? 'Already have an account? <span class="font-bold text-white">Sign In</span>'
         : "Don't have an account? <span class=\"font-bold text-white\">Sign Up</span>";
+
+    const forgotLink = document.getElementById('forgot-pwd-link');
+    if (forgotLink) forgotLink.style.display = isSignUpMode ? 'none' : 'inline-block';
+
     document.getElementById('auth-error').classList.add('hidden');
+    document.getElementById('auth-success')?.classList.add('hidden');
+}
+
+async function handleForgotPassword() {
+    const emailInput = document.getElementById('auth-email');
+    const errorBox = document.getElementById('auth-error');
+    const successBox = document.getElementById('auth-success');
+
+    errorBox.classList.add('hidden');
+    if (successBox) successBox.classList.add('hidden');
+
+    const email = emailInput.value.trim();
+    if (!email) {
+        errorBox.innerText = 'Please type your email address in the box above first, then click "Forgot password?".';
+        errorBox.classList.remove('hidden');
+        emailInput.focus();
+        return;
+    }
+
+    try {
+        const redirectUrl = window.location.origin + window.location.pathname;
+        const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+            redirectTo: redirectUrl
+        });
+
+        if (error) throw error;
+
+        if (successBox) {
+            successBox.innerText = 'Password reset link sent! Check your email inbox (and spam folder).';
+            successBox.classList.remove('hidden');
+        }
+    } catch (err) {
+        errorBox.innerText = err.message;
+        errorBox.classList.remove('hidden');
+    }
+}
+
+async function handleUpdatePassword(e) {
+    e.preventDefault();
+    const newPassword = document.getElementById('new-password').value;
+    const errorBox = document.getElementById('reset-error');
+    const submitBtn = document.getElementById('reset-submit-btn');
+
+    errorBox.classList.add('hidden');
+    submitBtn.disabled = true;
+    submitBtn.innerText = 'Updating...';
+
+    try {
+        const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+        if (error) throw error;
+
+        document.getElementById('reset-password-form').classList.add('hidden');
+        document.getElementById('auth-form').classList.remove('hidden');
+        document.getElementById('auth-footer-toggle').classList.remove('hidden');
+        switchTab('tasks');
+    } catch (err) {
+        errorBox.innerText = err.message;
+        errorBox.classList.remove('hidden');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerText = 'Save New Password';
+    }
 }
 
 async function handleAuthSubmit(e) {
@@ -483,9 +556,11 @@ async function handleAuthSubmit(e) {
     const email = document.getElementById('auth-email').value;
     const password = document.getElementById('auth-password').value;
     const errorBox = document.getElementById('auth-error');
+    const successBox = document.getElementById('auth-success');
     const submitBtn = document.getElementById('auth-submit-btn');
 
     errorBox.classList.add('hidden');
+    if (successBox) successBox.classList.add('hidden');
     submitBtn.disabled = true;
     submitBtn.innerText = 'Processing...';
 
@@ -532,9 +607,84 @@ function updateAuthUI(user) {
     lucide.createIcons();
 }
 
+// --- AD-FREE BACKGROUND FOCUS MUSIC PLAYER ---
+let isMusicPlaying = false;
+
+function toggleMusic() {
+    const audio = document.getElementById('bg-audio');
+    const icon = document.getElementById('music-icon');
+    if (!audio || !icon) return;
+
+    if (isMusicPlaying) {
+        audio.pause();
+        isMusicPlaying = false;
+        icon.setAttribute('data-lucide', 'play');
+    } else {
+        audio.volume = document.getElementById('music-volume')?.value || 0.4;
+        audio.play().then(() => {
+            isMusicPlaying = true;
+            icon.setAttribute('data-lucide', 'pause');
+            lucide.createIcons();
+        }).catch(err => {
+            console.error("Audio playback error:", err);
+            alert("Stream is buffering or temporarily unavailable. Try switching stations!");
+        });
+    }
+    lucide.createIcons();
+}
+
+function changeStation() {
+    const audio = document.getElementById('bg-audio');
+    const source = document.getElementById('bg-audio-source');
+    const stationSelect = document.getElementById('music-station');
+    if (!audio || !source || !stationSelect) return;
+
+    source.src = stationSelect.value;
+    audio.load();
+
+    if (isMusicPlaying) {
+        audio.play().catch(err => {
+            console.error("Stream switch error:", err);
+            isMusicPlaying = false;
+            document.getElementById('music-icon')?.setAttribute('data-lucide', 'play');
+            lucide.createIcons();
+        });
+    }
+}
+
+function setMusicVolume(val) {
+    const audio = document.getElementById('bg-audio');
+    if (audio) audio.volume = val;
+}
+
+function handleAudioError() {
+    console.warn("Audio stream connection error encountered.");
+    isMusicPlaying = false;
+    const icon = document.getElementById('music-icon');
+    if (icon) {
+        icon.setAttribute('data-lucide', 'play');
+        lucide.createIcons();
+    }
+}
+
+// Listen for auth state changes (Login, Logout, Password Recovery)
+supabaseClient.auth.onAuthStateChange((event, session) => {
+    if (event === 'PASSWORD_RECOVERY') {
+        switchTab('auth');
+        document.getElementById('auth-title').innerText = 'Reset Your Password';
+        document.getElementById('auth-subtitle').innerText = 'Enter a new password for your Bloom account.';
+        document.getElementById('auth-form').classList.add('hidden');
+        document.getElementById('auth-footer-toggle').classList.add('hidden');
+        document.getElementById('reset-password-form').classList.remove('hidden');
+    } else {
+        updateAuthUI(session?.user || null);
+        fetchTasks();
+    }
+});
+
 // INITIALIZATION ON DOM LOAD
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("Bloom application initialized with Supabase & Gemini AI.");
+    console.log("Bloom application initialized.");
     lucide.createIcons();
     fetchTasks();
     switchCategory('career');
@@ -547,9 +697,4 @@ document.addEventListener('DOMContentLoaded', () => {
     supabaseClient.auth.getSession().then(({ data: { session } }) => {
         updateAuthUI(session?.user || null);
     });
-});
-
-supabaseClient.auth.onAuthStateChange((event, session) => {
-    updateAuthUI(session?.user || null);
-    fetchTasks();
 });

@@ -35,7 +35,7 @@ async function fetchTasks() {
 }
 
 
-async function handleAddTask(e) {
+async function: handleAddTask(e) {
     e.preventDefault();
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session) { alert("You must be logged in to create tasks."); switchTab('auth'); return; }
@@ -61,9 +61,12 @@ async function handleAddTask(e) {
 
     };
 
-    const { error } = await supabaseClient
-        .from('tasks')
-        .insert([newTask]);
+   async function handleAddTask(e) {
+    e.preventDefault();
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) { alert("You must be logged in to create tasks."); switchTab('auth'); return; }
+    // ... rest of your code
+}
 
     if (error) {
         console.error("Supabase Error:", error.message);

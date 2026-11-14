@@ -9,32 +9,56 @@ let tasks = [];
 let currentFilter = 'all';
 
 async function fetchTasks() {
-    const { data, error } = await supabaseClient
-        .from('tasks')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-    if (error) {
-        console.error('Error fetching tasks:', error);
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const container = document.getElementById('tasks-container');
+    if (!session) {
+        tasks = [];
+        if (container) {
+            container.innerHTML = `
+                <div class="text-center py-12 bg-slate-900/30 rounded-2xl border border-white/5 space-y-3">
+                    <p class="text-slate-400 text-sm">Please log in to view and manage your personal tasks.</p>
+                    <button onclick="switchTab('auth')" class="px-4 py-2 rounded-xl bg-rose-500 text-white text-xs font-semibold hover:bg-rose-600 transition-colors">Log In Now</button>
+                </div>
+            `;
+        }
+        const progressBar = document.getElementById('task-progress-bar');
+        const progressText = document.getElementById('task-progress-text');
+        if (progressBar) progressBar.style.width = '0%';
+        if (progressText) progressText.innerText = '0%';
         return;
     }
+
+    const { data, error } = await supabaseClient.from('tasks').select('*').order('created_at', { ascending: false });
+    if (error) { console.error('Error fetching tasks:', error); return; }
     tasks = data || [];
     renderTasks();
 }
 
+
 async function handleAddTask(e) {
     e.preventDefault();
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) { alert("You must be logged in to create tasks."); switchTab('auth'); return; }
+
     const titleInput = document.getElementById('task-title');
     const priorityInput = document.getElementById('task-priority');
     const categoryInput = document.getElementById('task-category');
-
     if (!titleInput || !priorityInput || !categoryInput) return;
 
     const newTask = {
         title: titleInput.value,
         priority: priorityInput.value,
         category: categoryInput.value,
-        completed: false
+        completed: false,
+        user_id: session.user.id
+    };
+
+    const { error } = await supabaseClient.from('tasks').insert([newTask]);
+    if (error) { alert("Failed to save task: " + error.message); return; }
+
+    titleInput.value = '';
+    fetchTasks();
+
     };
 
     const { error } = await supabaseClient
@@ -520,4 +544,9 @@ document.addEventListener('DOMContentLoaded', () => {
     supabaseClient.auth.getSession().then(({ data: { session } }) => {
         updateAuthUI(session?.user || null);
     });
+});
+
+supabaseClient.auth.onAuthStateChange((event, session) => {
+    updateAuthUI(session?.user || null);
+    fetchTasks();
 });

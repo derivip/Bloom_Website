@@ -640,6 +640,17 @@ async function selectChatSession(sessionId) {
 
     if (error) {
         console.error("Error loading messages:", error);
+        chatContainer.innerHTML = `
+            <div class="flex items-start space-x-3">
+                <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
+                    <i data-lucide="flower-2" class="w-4 h-4"></i>
+                </div>
+                <div class="bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 text-sm leading-relaxed">
+                    Hey there. 👋 I’m Bloom. Ask me anything, upload an image or file, or ask me to create a visual roadmap!
+                </div>
+            </div>
+        `;
+        lucide.createIcons();
         return;
     }
 
@@ -738,34 +749,7 @@ async function handleSendMessage(e) {
         ? (attachedNames ? `${text} [Attached: ${attachedNames}]` : text)
         : `[Attached: ${attachedNames}]`;
 
-    // Save user message
-    await supabaseClient.from('chat_messages').insert([{
-        session_id: currentSessionId,
-        user_id: session.user.id,
-        role: 'user',
-        content: displayPrompt
-    }]);
-
-    // AI-generated smart title on first message
-    const activeSession = chatSessions.find(s => s.id === currentSessionId);
-    if (activeSession && activeSession.title === 'New Conversation') {
-        try {
-            const titlePrompt = `Generate a short, punchy 2 to 4 word title summarizing this user prompt: "${displayPrompt}". Return ONLY the title text with no quotes, punctuation, or extra words.`;
-            const { data: titleData } = await supabaseClient.functions.invoke('gemini-proxy', {
-                body: { prompt: titlePrompt }
-            });
-            const generatedTitle = titleData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || (displayPrompt.length > 25 ? displayPrompt.substring(0, 25) + '...' : displayPrompt);
-            
-            await supabaseClient.from('chat_sessions').update({ title: generatedTitle }).eq('id', currentSessionId);
-            activeSession.title = generatedTitle;
-            renderChatSessionsList();
-            const titleEl = document.getElementById('active-chat-title');
-            if (titleEl) titleEl.innerText = generatedTitle;
-        } catch (err) {
-            console.warn("Auto-title generation error:", err);
-        }
-    }
-
+    // Render user message immediately on screen
     chatContainer.insertAdjacentHTML('beforeend', `
         <div class="flex items-start justify-end space-x-3">
             <div class="bg-rose-600 text-white p-4 rounded-2xl rounded-tr-none max-w-[85%] text-sm leading-relaxed shadow-md">
@@ -775,6 +759,18 @@ async function handleSendMessage(e) {
     `);
     if (input) input.value = '';
     chatContainer.scrollTop = chatContainer.scrollHeight;
+
+    // Save user message in background so a DB error never blocks the AI response
+    if (currentSessionId) {
+        supabaseClient.from('chat_messages').insert([{
+            session_id: currentSessionId,
+            user_id: session.user.id,
+            role: 'user',
+            content: displayPrompt
+        }]).then(({ error }) => {
+            if (error) console.warn("DB save user msg warning:", error.message);
+        });
+    }
 
     const typingId = 'typing-' + Date.now();
     chatContainer.insertAdjacentHTML('beforeend', `
@@ -825,12 +821,29 @@ User prompt: ${text || "Please analyze the attached file(s) thoroughly."}`;
 
         const aiReply = data?.candidates?.[0]?.content?.parts?.[0]?.text || data?.reply || "I'm right here with you. Let's explore this together step by step.";
 
-        await supabaseClient.from('chat_messages').insert([{
-            session_id: currentSessionId,
-            user_id: session.user.id,
-            role: 'assistant',
-            content: aiReply
-        }]);
+        // Save assistant message safely in background
+        if (currentSessionId) {
+            supabaseClient.from('chat_messages').insert([{
+                session_id: currentSessionId,
+                user_id: session.user.id,
+                role: 'assistant',
+                content: aiReply
+            }]).then(({ error: dbErr }) => {
+                if (dbErr) console.warn("DB save AI msg warning:", dbErr.message);
+            });
+        }
+
+        // Smart auto-title on first message
+        const activeSession = chatSessions.find(s => s.id === currentSessionId);
+        if (activeSession && activeSession.title === 'New Conversation') {
+            const shortTitle = displayPrompt.length > 28 ? displayPrompt.substring(0, 28) + '...' : displayPrompt;
+            supabaseClient.from('chat_sessions').update({ title: shortTitle }).eq('id', currentSessionId).then(() => {
+                activeSession.title = shortTitle;
+                renderChatSessionsList();
+                const titleEl = document.getElementById('active-chat-title');
+                if (titleEl) titleEl.innerText = shortTitle;
+            });
+        }
 
         chatContainer.insertAdjacentHTML('beforeend', `
             <div class="flex items-start space-x-3">
@@ -913,7 +926,7 @@ async function handleForgotPassword() {
         }
     } catch (err) {
         errorBox.innerText = err.message;
-        errorBox.classList.add('hidden');
+        errorBox.classList.remove('hidden');
     }
 }
 
@@ -937,7 +950,7 @@ async function handleUpdatePassword(e) {
         switchTab('tasks');
     } catch (err) {
         errorBox.innerText = err.message;
-        errorBox.classList.add('hidden');
+        errorBox.classList.remove('hidden');
     } finally {
         submitBtn.disabled = false;
         submitBtn.innerText = 'Save New Password';
@@ -971,7 +984,7 @@ async function handleAuthSubmit(e) {
         switchTab('tasks');
     } catch (err) {
         errorBox.innerText = err.message;
-        errorBox.classList.add('hidden');
+        errorBox.classList.remove('hidden');
     } finally {
         submitBtn.disabled = false;
         submitBtn.innerText = isSignUpMode ? 'Sign Up' : 'Sign In';

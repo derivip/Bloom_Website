@@ -1,270 +1,214 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bloom - Mindful Focus & Youth Guidance</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f43f5e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='3'/><path d='M12 16.5A4.5 4.5 0 1 1 7.5 12 4.5 4.5 0 1 1 12 7.5a4.5 4.5 0 1 1 4.5 4.5 4.5 4.5 0 1 1-4.5 4.5'/><path d='M12 7.5V9'/><path d='M7.5 12H9'/><path d='M16.5 12H15'/><path d='M12 16.5V15'/></svg>">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(244, 63, 94, 0.5); }
+    </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen font-sans flex flex-col justify-between selection:bg-rose-500 selection:text-white">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-rose-500/30 selection:text-rose-200">
 
-    <!-- NAVIGATION BAR -->
-    <header class="sticky top-0 z-50 backdrop-blur-md bg-slate-950/75 border-b border-white/10 px-6 py-4 flex items-center justify-between transition-all">
-        <div class="flex items-center space-x-3 cursor-pointer" onclick="switchTab('home')">
-            <div class="p-2 rounded-full bg-gradient-to-tr from-rose-500 via-purple-500 to-indigo-500 shadow-lg shadow-rose-500/20">
-                <i data-lucide="flower-2" class="w-6 h-6 text-white animate-spin-slow"></i>
+    <!-- TOP NAVIGATION BAR -->
+    <nav class="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-xl border-b border-white/10">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+            <!-- Brand -->
+            <div onclick="switchTab('home')" class="flex items-center space-x-2.5 cursor-pointer group">
+                <div class="p-2 rounded-xl bg-gradient-to-tr from-rose-500 to-purple-600 text-white shadow-lg shadow-rose-500/20 group-hover:scale-105 transition-transform">
+                    <i data-lucide="flower-2" class="w-5 h-5"></i>
+                </div>
+                <span class="font-extrabold text-xl tracking-tight bg-gradient-to-r from-white via-rose-200 to-purple-300 bg-clip-text text-transparent">Bloom</span>
             </div>
-            <span class="text-2xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-rose-400 via-purple-300 to-indigo-300">Bloom</span>
-        </div>
 
-        <nav class="hidden md:flex items-center space-x-1 bg-white/5 border border-white/10 p-1.5 rounded-full backdrop-blur-lg">
-            <button onclick="switchTab('home')" id="nav-home" class="nav-btn px-5 py-2 rounded-full text-sm font-semibold transition-all duration-300 bg-white/15 text-white shadow-sm">Home</button>
-            <button onclick="switchTab('tasks')" id="nav-tasks" class="nav-btn px-5 py-2 rounded-full text-sm font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all duration-300">Focus Hub</button>
-            <button onclick="switchTab('learn')" id="nav-learn" class="nav-btn px-5 py-2 rounded-full text-sm font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all duration-300">Guidance Library</button>
-            <button onclick="switchTab('chat')" id="nav-chat" class="nav-btn px-5 py-2 rounded-full text-sm font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all duration-300 flex items-center space-x-2">
-                <span>Explore Bloom AI</span>
-                <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">24/7</span>
-            </button>
-        </nav>
-
-        <div class="flex items-center space-x-3">
-            <button id="auth-nav-btn" onclick="switchTab('auth')" class="px-5 py-2 text-xs font-semibold rounded-full bg-gradient-to-r from-rose-500 to-purple-600 hover:from-rose-600 hover:to-purple-700 text-white shadow-md shadow-purple-500/25 transition-all duration-300 hover:scale-105 flex items-center space-x-2">
-                <i data-lucide="log-in" class="w-4 h-4"></i>
-                <span>Log In</span>
-            </button>
-        </div>
-    </header>
-
-    <!-- MOBILE NAVIGATION BAR -->
-    <div class="md:hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-slate-900/90 border border-white/15 backdrop-blur-xl px-4 py-2 rounded-full flex space-x-4 shadow-2xl">
-        <button onclick="switchTab('home')" id="mnav-home" class="p-2 text-rose-400"><i data-lucide="home" class="w-5 h-5"></i></button>
-        <button onclick="switchTab('tasks')" id="mnav-tasks" class="p-2 text-slate-400"><i data-lucide="check-square" class="w-5 h-5"></i></button>
-        <button onclick="switchTab('learn')" id="mnav-learn" class="p-2 text-slate-400"><i data-lucide="book-open" class="w-5 h-5"></i></button>
-        <button onclick="switchTab('chat')" id="mnav-chat" class="p-2 text-slate-400"><i data-lucide="bot" class="w-5 h-5"></i></button>
-        <button onclick="switchTab('auth')" id="mnav-auth" class="p-2 text-slate-400"><i data-lucide="log-in" class="w-5 h-5"></i></button>
-    </div>
-
-    <!-- MAIN CONTENT CONTAINERS -->
-    <main class="flex-grow max-w-7xl w-full mx-auto p-4 md:p-8">
-
-      <!-- 0. AUTHENTICATION VIEW (LOGIN / SIGN UP / PASSWORD RESET) -->
-<section id="view-auth" class="hidden flex items-center justify-center min-h-[70vh]">
-    <div class="w-full max-w-md bg-slate-900/90 border border-white/10 p-8 rounded-3xl shadow-2xl space-y-6 backdrop-blur-xl">
-        <div class="text-center space-y-2">
-            <div class="mx-auto w-12 h-12 rounded-full bg-gradient-to-tr from-rose-500 via-purple-500 to-indigo-500 flex items-center justify-center shadow-lg shadow-rose-500/20">
-                <i data-lucide="lock" class="w-6 h-6 text-white"></i>
+            <!-- Desktop Navigation -->
+            <div class="hidden md:flex items-center space-x-1 bg-slate-900/90 p-1 rounded-2xl border border-white/10">
+                <button id="nav-home" onclick="switchTab('home')" class="px-4 py-1.5 rounded-xl text-xs font-semibold bg-white/15 text-white transition-all">Home</button>
+                <button id="nav-tasks" onclick="switchTab('tasks')" class="px-4 py-1.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition-all">Focus Tasks</button>
+                <button id="nav-learn" onclick="switchTab('learn')" class="px-4 py-1.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition-all">Guidance Library</button>
+                <button id="nav-chat" onclick="switchTab('chat')" class="px-4 py-1.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition-all flex items-center gap-1.5">
+                    <i data-lucide="sparkles" class="w-3.5 h-3.5 text-rose-400"></i>
+                    <span>Bloom AI</span>
+                </button>
             </div>
-            <h2 id="auth-title" class="text-2xl font-extrabold text-white">Welcome Back</h2>
-            <p id="auth-subtitle" class="text-xs text-slate-400">Sign in to sync your tasks and Bloom AI chats.</p>
-        </div>
 
-        <!-- STANDARD LOGIN / SIGN UP FORM -->
-        <form id="auth-form" onsubmit="handleAuthSubmit(event)" class="space-y-4">
+            <!-- Auth Action -->
             <div>
-                <label class="block text-xs font-medium text-slate-400 mb-1">Email Address</label>
-                <input type="email" id="auth-email" required placeholder="you@example.com" class="w-full bg-slate-950 border border-white/15 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-rose-500 transition-colors">
+                <button id="auth-nav-btn" onclick="switchTab('auth')" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-white flex items-center space-x-1.5 transition-all">
+                    <i data-lucide="log-in" class="w-4 h-4"></i>
+                    <span>Log In</span>
+                </button>
             </div>
-            <div>
-                <div class="flex items-center justify-between mb-1">
-                    <label class="block text-xs font-medium text-slate-400">Password</label>
-                    <button type="button" id="forgot-pwd-link" onclick="handleForgotPassword()" class="text-[11px] text-rose-400 hover:text-rose-300 transition-colors">
-                        Forgot password?
+        </div>
+    </nav>
+
+    <!-- MAIN CONTENT CONTAINER -->
+    <main class="flex-grow max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 pb-28">
+
+        <!-- 0. AUTHENTICATION VIEW -->
+        <section id="view-auth" class="hidden max-w-md mx-auto py-10">
+            <div class="bg-slate-900/90 border border-white/10 rounded-3xl p-8 shadow-2xl backdrop-blur-xl space-y-6">
+                <div class="text-center space-y-2">
+                    <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-rose-500 to-purple-600 text-white flex items-center justify-center mx-auto shadow-lg shadow-rose-500/20">
+                        <i data-lucide="flower-2" class="w-6 h-6"></i>
+                    </div>
+                    <h2 id="auth-title" class="text-2xl font-bold text-white">Welcome Back</h2>
+                    <p id="auth-subtitle" class="text-xs text-slate-400">Sign in to sync your tasks and Bloom AI chats.</p>
+                </div>
+
+                <div id="auth-error" class="hidden p-3 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 text-xs"></div>
+                <div id="auth-success" class="hidden p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs"></div>
+
+                <!-- Sign In / Sign Up Form -->
+                <form id="auth-form" onsubmit="handleAuthSubmit(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1.5">Email Address</label>
+                        <input type="email" id="auth-email" required placeholder="you@example.com" class="w-full bg-slate-950 border border-white/15 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-rose-500">
+                    </div>
+                    <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="block text-xs font-semibold text-slate-300">Password</label>
+                            <button type="button" id="forgot-pwd-link" onclick="handleForgotPassword()" class="text-[11px] text-rose-400 hover:underline">Forgot password?</button>
+                        </div>
+                        <input type="password" id="auth-password" required placeholder="••••••••" class="w-full bg-slate-950 border border-white/15 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-rose-500">
+                    </div>
+                    <button type="submit" id="auth-submit-btn" class="w-full py-3 rounded-xl bg-gradient-to-r from-rose-500 to-purple-600 hover:from-rose-600 hover:to-purple-700 text-white font-semibold text-sm shadow-lg shadow-purple-500/20 transition-all">
+                        Sign In
+                    </button>
+                </form>
+
+                <!-- Password Recovery Form -->
+                <form id="reset-password-form" onsubmit="handleUpdatePassword(event)" class="hidden space-y-4">
+                    <div id="reset-error" class="hidden p-3 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 text-xs"></div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1.5">New Password</label>
+                        <input type="password" id="new-password" required minlength="6" placeholder="At least 6 characters" class="w-full bg-slate-950 border border-white/15 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-rose-500">
+                    </div>
+                    <button type="submit" id="reset-submit-btn" class="w-full py-3 rounded-xl bg-gradient-to-r from-rose-500 to-purple-600 text-white font-semibold text-sm">
+                        Save New Password
+                    </button>
+                </form>
+
+                <div id="auth-footer-toggle" class="text-center pt-2 border-t border-white/10">
+                    <button type="button" id="auth-toggle-btn" onclick="toggleAuthMode()" class="text-xs text-slate-400 hover:text-white transition-colors">
+                        Don't have an account? <span class="font-bold text-white">Sign Up</span>
                     </button>
                 </div>
-                <input type="password" id="auth-password" required placeholder="••••••••" minlength="6" class="w-full bg-slate-950 border border-white/15 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-rose-500 transition-colors">
-            </div>
-
-            <div id="auth-error" class="hidden text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 p-3 rounded-xl"></div>
-            <div id="auth-success" class="hidden text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl"></div>
-
-            <button type="submit" id="auth-submit-btn" class="w-full bg-gradient-to-r from-rose-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:opacity-90 transition-opacity shadow-md shadow-rose-500/20">
-                Sign In
-            </button>
-        </form>
-
-        <!-- NEW PASSWORD FORM (SHOWN ONLY AFTER CLICKING EMAIL RESET LINK) -->
-        <form id="reset-password-form" onsubmit="handleUpdatePassword(event)" class="hidden space-y-4">
-            <div>
-                <label class="block text-xs font-medium text-slate-400 mb-1">New Password</label>
-                <input type="password" id="new-password" required placeholder="Enter new password (min 6 chars)" minlength="6" class="w-full bg-slate-950 border border-white/15 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-rose-500 transition-colors">
-            </div>
-            <div id="reset-error" class="hidden text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 p-3 rounded-xl"></div>
-            <button type="submit" id="reset-submit-btn" class="w-full bg-gradient-to-r from-rose-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:opacity-90 transition-opacity shadow-md shadow-rose-500/20">
-                Save New Password
-            </button>
-        </form>
-
-        <div id="auth-footer-toggle" class="text-center pt-2 border-t border-white/10">
-            <button type="button" onclick="toggleAuthMode()" id="auth-toggle-btn" class="text-xs text-slate-400 hover:text-rose-400 transition-colors">
-                Don't have an account? <span class="font-bold text-white">Sign Up</span>
-            </button>
-        </div>
-    </div>
-</section>
-        <!-- 1. HOME VIEW / HERO -->
-        <section id="view-home" class="space-y-12 transition-all duration-500">
-            <div class="animated-gradient-hero relative overflow-hidden rounded-3xl p-8 md:p-16 border border-white/10 shadow-2xl flex flex-col justify-center items-center text-center min-h-[460px]">
-                <div class="absolute inset-0 bg-black/30 backdrop-blur-[2px]"></div>
-                
-                <div class="relative z-10 space-y-6 max-w-3xl">
-                    <div class="inline-flex items-center space-x-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-xs font-medium tracking-wide text-rose-200">
-                        <i data-lucide="sparkles" class="w-4 h-4 text-rose-300 animate-pulse"></i>
-                        <span>A Space Designed for Your Peace & Growth</span>
-                    </div>
-
-                    <div class="min-h-[140px] flex items-center justify-center">
-                        <blockquote id="inspirational-quote" class="text-2xl md:text-4xl font-extrabold text-white tracking-tight leading-tight transition-opacity duration-500 drop-shadow-md">
-                            "It’s not about having time, it’s about making time."
-                        </blockquote>
-                    </div>
-
-                    <div id="quote-source" class="text-xs font-semibold uppercase tracking-widest text-slate-300/80">
-                        — Captain America (Avengers: Endgame)
-                    </div>
-
-                    <div class="pt-6 flex flex-wrap justify-center gap-4">
-                        <button onclick="switchTab('tasks')" class="px-6 py-3 rounded-full bg-white text-slate-950 font-bold hover:bg-slate-200 transition-all shadow-lg flex items-center space-x-2">
-                            <span>Organize Your Day</span>
-                            <i data-lucide="arrow-right" class="w-4 h-4"></i>
-                        </button>
-                        <button onclick="switchTab('chat')" class="px-6 py-3 rounded-full bg-white/10 hover:bg-white/20 text-white font-semibold backdrop-blur-md border border-white/20 transition-all flex items-center space-x-2">
-                            <i data-lucide="message-square" class="w-4 h-4"></i>
-                            <span>Explore Bloom AI</span>
-                        </button>
-                        <button onclick="switchTab('auth')" class="px-6 py-3 rounded-full bg-gradient-to-r from-rose-500 to-purple-600 hover:opacity-95 text-white font-semibold shadow-lg flex items-center space-x-2">
-                            <i data-lucide="log-in" class="w-4 h-4"></i>
-                            <span>Log In / Sign Up</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div onclick="switchTab('tasks')" class="cursor-pointer group p-6 rounded-2xl bg-slate-900/50 border border-white/10 hover:border-rose-500/50 transition-all hover:scale-[1.02] shadow-xl">
-                    <div class="p-3 w-max rounded-xl bg-rose-500/10 text-rose-400 mb-4 group-hover:scale-110 transition-transform">
-                        <i data-lucide="list-todo" class="w-6 h-6"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-white mb-2">Priority Task Hub</h3>
-                    <p class="text-slate-400 text-sm leading-relaxed">Break down overwhelming workloads into simple High, Medium, and Low priority steps.</p>
-                </div>
-
-                <div onclick="switchTab('learn')" class="cursor-pointer group p-6 rounded-2xl bg-slate-900/50 border border-white/10 hover:border-purple-500/50 transition-all hover:scale-[1.02] shadow-xl">
-                    <div class="p-3 w-max rounded-xl bg-purple-500/10 text-purple-400 mb-4 group-hover:scale-110 transition-transform">
-                        <i data-lucide="compass" class="w-6 h-6"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-white mb-2">Real Advice Library</h3>
-                    <p class="text-slate-400 text-sm leading-relaxed">Modern guidebooks on managing school, jobs, mental exhaustion, and personal relationships.</p>
-                </div>
-
-                <div onclick="switchTab('chat')" class="cursor-pointer group p-6 rounded-2xl bg-slate-900/50 border border-white/10 hover:border-indigo-500/50 transition-all hover:scale-[1.02] shadow-xl">
-                    <div class="p-3 w-max rounded-xl bg-indigo-500/10 text-indigo-400 mb-4 group-hover:scale-110 transition-transform">
-                        <i data-lucide="bot" class="w-6 h-6"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-white mb-2">24/7 Explore Bloom AI</h3>
-                    <p class="text-slate-400 text-sm leading-relaxed">Get anytime support using Explore Bloom AI that's powered by Gemini!</p>
-                </div>
             </div>
         </section>
 
-        <!-- 2. TASK DASHBOARD VIEW -->
-        <section id="view-tasks" class="hidden space-y-8">
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-6">
+        <!-- 1. HOME VIEW -->
+        <section id="view-home" class="space-y-8">
+            <div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-rose-950/40 border border-white/10 p-8 md:p-12 shadow-2xl">
+                <div class="max-w-2xl space-y-5">
+                    <span class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-semibold">
+                        <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                        <span>Mindful Productivity & AI Guidance</span>
+                    </span>
+                    <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight text-white leading-tight">
+                        Grow at your own pace, <span class="bg-gradient-to-r from-rose-400 to-purple-400 bg-clip-text text-transparent">without the burnout.</span>
+                    </h1>
+                    <p class="text-slate-300 text-sm sm:text-base leading-relaxed">
+                        Bloom helps students and young adults break down overwhelming tasks, explore real-world guidance, and talk through life with an intelligent AI companion.
+                    </p>
+                    <div class="flex flex-wrap gap-3 pt-2">
+                        <button onclick="switchTab('chat')" class="px-6 py-3 rounded-2xl bg-gradient-to-r from-rose-500 to-purple-600 hover:from-rose-600 hover:to-purple-700 text-white font-semibold text-sm shadow-lg shadow-rose-500/25 flex items-center gap-2 transition-all">
+                            <i data-lucide="bot" class="w-4 h-4"></i>
+                            <span>Talk to Bloom AI</span>
+                        </button>
+                        <button onclick="switchTab('tasks')" class="px-6 py-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/15 text-white font-semibold text-sm transition-all">
+                            Open Focus Tasks
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Inspirational Quote Card -->
+            <div class="p-6 rounded-3xl bg-slate-900/70 border border-white/10 text-center space-y-2">
+                <p id="inspirational-quote" class="text-base sm:text-lg font-medium text-slate-200 italic transition-opacity duration-500">
+                    "It’s not about having time, it’s about making time."
+                </p>
+                <p id="quote-source" class="text-xs text-rose-400 font-semibold">— Captain America (Avengers: Endgame)</p>
+            </div>
+        </section>
+
+        <!-- 2. FOCUS TASKS VIEW -->
+        <section id="view-tasks" class="hidden space-y-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 class="text-3xl font-extrabold text-white tracking-tight">Task Focus Hub</h1>
-                    <p class="text-slate-400 text-sm">Organize homework, work shifts, and personal chores effortlessly.</p>
+                    <h2 class="text-2xl font-bold text-white">Focus Tasks</h2>
+                    <p class="text-xs text-slate-400">Break big goals into tiny, stress-free micro-steps with BloomAI.</p>
                 </div>
-                <div class="bg-slate-900 border border-white/10 p-4 rounded-2xl w-full md:w-80">
-                    <div class="flex justify-between text-xs font-semibold mb-2">
-                        <span class="text-slate-400">Completion Rate</span>
-                        <span id="task-progress-text" class="text-rose-400">0%</span>
+                <div class="flex items-center space-x-3 bg-slate-900/90 px-4 py-2.5 rounded-2xl border border-white/10">
+                    <span class="text-xs text-slate-400 font-medium">Progress</span>
+                    <div class="w-28 h-2 bg-slate-800 rounded-full overflow-hidden">
+                        <div id="task-progress-bar" class="h-full bg-gradient-to-r from-rose-500 to-purple-500 transition-all duration-300" style="width: 0%"></div>
                     </div>
-                    <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
-                        <div id="task-progress-bar" class="bg-gradient-to-r from-rose-500 to-indigo-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
-                    </div>
+                    <span id="task-progress-text" class="text-xs font-bold text-white">0%</span>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div class="lg:col-span-1 bg-slate-900/80 border border-white/10 p-6 rounded-2xl h-fit space-y-4">
-                    <h2 class="text-lg font-bold text-white flex items-center space-x-2">
-                        <i data-lucide="plus-circle" class="w-5 h-5 text-rose-400"></i>
-                        <span>Add New Task</span>
-                    </h2>
-                    <form id="task-form" class="space-y-4">
-                        <div>
-                            <label class="block text-xs font-medium text-slate-400 mb-1">Task Title</label>
-                            <input type="text" id="task-title" required placeholder="e.g. Finish Physics Lab Report" class="w-full bg-slate-950 border border-white/15 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-rose-500 transition-colors">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-slate-400 mb-1">Priority Level</label>
-                            <select id="task-priority" class="w-full bg-slate-950 border border-white/15 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-rose-500 transition-colors">
-                                <option value="high">🔥 High Priority (Urgent)</option>
-                                <option value="medium" selected>⚡ Medium Priority (Important)</option>
-                                <option value="low">🌱 Low Priority (Whenever)</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-slate-400 mb-1">Category</label>
-                            <select id="task-category" class="w-full bg-slate-950 border border-white/15 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-rose-500 transition-colors">
-                                <option value="School">School & Studies</option>
-                                <option value="Job">Work & Job Shift</option>
-                                <option value="Personal">Personal & Well-being</option>
-                            </select>
-                        </div>
-                        <button type="submit" class="w-full bg-gradient-to-r from-rose-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:opacity-90 transition-opacity flex justify-center items-center space-x-2 shadow-md shadow-rose-500/20">
-                            <i data-lucide="plus" class="w-4 h-4"></i>
-                            <span>Create Task</span>
-                        </button>
-                    </form>
-                </div>
+            <!-- Add Task Form -->
+            <form id="task-form" autocomplete="off" class="grid grid-cols-1 sm:grid-cols-12 gap-3 bg-slate-900/80 p-4 rounded-2xl border border-white/10">
+                <input type="text" id="task-title" required placeholder="What needs to get done?" class="sm:col-span-6 bg-slate-950 border border-white/15 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-rose-500">
+                <select id="task-category" class="sm:col-span-2 bg-slate-950 border border-white/15 rounded-xl px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-rose-500">
+                    <option value="School">School</option>
+                    <option value="Work">Work</option>
+                    <option value="Personal">Personal</option>
+                </select>
+                <select id="task-priority" class="sm:col-span-2 bg-slate-950 border border-white/15 rounded-xl px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-rose-500">
+                    <option value="high">High Priority</option>
+                    <option value="medium" selected>Medium Priority</option>
+                    <option value="low">Low Priority</option>
+                </select>
+                <button type="submit" class="sm:col-span-2 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold transition-colors">
+                    + Add Task
+                </button>
+            </form>
 
-                <div class="lg:col-span-2 space-y-4">
-                    <div class="flex items-center justify-between gap-2 overflow-x-auto pb-2">
-                        <div class="flex space-x-2">
-                            <button onclick="filterTasks('all')" id="filter-all" class="filter-btn px-4 py-1.5 rounded-xl text-xs font-medium bg-rose-500/20 border border-rose-500 text-rose-300">All</button>
-                            <button onclick="filterTasks('high')" id="filter-high" class="filter-btn px-4 py-1.5 rounded-xl text-xs font-medium bg-slate-900 border border-white/10 text-slate-400 hover:text-white">High</button>
-                            <button onclick="filterTasks('medium')" id="filter-medium" class="filter-btn px-4 py-1.5 rounded-xl text-xs font-medium bg-slate-900 border border-white/10 text-slate-400 hover:text-white">Medium</button>
-                            <button onclick="filterTasks('low')" id="filter-low" class="filter-btn px-4 py-1.5 rounded-xl text-xs font-medium bg-slate-900 border border-white/10 text-slate-400 hover:text-white">Low</button>
-                        </div>
-                    </div>
-
-                    <div id="tasks-container" class="space-y-3">
-                        <!-- Dynamic Tasks Rendered Here -->
-                    </div>
-                </div>
+            <!-- Filters -->
+            <div class="flex gap-2 overflow-x-auto pb-1">
+                <button id="filter-all" onclick="filterTasks('all')" class="filter-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-rose-500/20 border border-rose-500 text-rose-300">All</button>
+                <button id="filter-high" onclick="filterTasks('high')" class="filter-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-900 border border-white/10 text-slate-400">High</button>
+                <button id="filter-medium" onclick="filterTasks('medium')" class="filter-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-900 border border-white/10 text-slate-400">Medium</button>
+                <button id="filter-low" onclick="filterTasks('low')" class="filter-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-900 border border-white/10 text-slate-400">Low</button>
             </div>
+
+            <!-- Tasks List -->
+            <div id="tasks-container" class="space-y-3"></div>
         </section>
 
-        <!-- 3. LEARNING & GUIDANCE PLATFORM VIEW -->
-        <section id="view-learn" class="hidden space-y-8">
-            <div class="border-b border-white/10 pb-6">
-                <h1 class="text-3xl font-extrabold text-white tracking-tight">Guidance & Resource Hub</h1>
-                <p class="text-slate-400 text-sm">Actionable advice, de-stressing activities, and modern tips for teen life.</p>
+        <!-- 3. GUIDANCE LIBRARY VIEW -->
+        <section id="view-learn" class="hidden space-y-6">
+            <div>
+                <h2 class="text-2xl font-bold text-white">Guidance Library</h2>
+                <p class="text-xs text-slate-400">Curated strategies for school, career, emotional resilience, and focus.</p>
             </div>
 
-            <div class="flex space-x-3 overflow-x-auto pb-2 border-b border-white/5">
-                <button onclick="switchCategory('career')" id="cat-career" class="cat-btn px-5 py-2.5 rounded-2xl text-sm font-semibold bg-rose-500 text-white shadow-md">💼 Career & School</button>
-                <button onclick="switchCategory('emotional')" id="cat-emotional" class="cat-btn px-5 py-2.5 rounded-2xl text-sm font-semibold bg-slate-900 text-slate-400 hover:text-white">🧠 Emotional & Stress</button>
-                <button onclick="switchCategory('personal')" id="cat-personal" class="cat-btn px-5 py-2.5 rounded-2xl text-sm font-semibold bg-slate-900 text-slate-400 hover:text-white">🌟 Personal Growth</button>
-                <button onclick="switchCategory('destress')" id="cat-destress" class="cat-btn px-5 py-2.5 rounded-2xl text-sm font-semibold bg-slate-900 text-slate-400 hover:text-white">🧘 De-Stress Toolkit</button>
+            <div class="flex gap-2 overflow-x-auto pb-2">
+                <button id="cat-career" onclick="switchCategory('career')" class="cat-btn px-4 py-2 rounded-xl text-xs font-semibold bg-rose-500 text-white whitespace-nowrap">Career & School</button>
+                <button id="cat-emotional" onclick="switchCategory('emotional')" class="cat-btn px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900 text-slate-400 whitespace-nowrap">Emotional & Stress</button>
+                <button id="cat-personal" onclick="switchCategory('personal')" class="cat-btn px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900 text-slate-400 whitespace-nowrap">Personal Growth</button>
+                <button id="cat-destress" onclick="switchCategory('destress')" class="cat-btn px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900 text-slate-400 whitespace-nowrap">De-Stress Toolkit</button>
             </div>
 
-            <div id="learning-content" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <!-- Content items populated dynamically via JavaScript -->
-            </div>
+            <div id="learning-content" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
         </section>
 
-        <!-- 4. EXPLORE BLOOM AI CHATBOT VIEW -->
-       <!-- 4. EXPLORE BLOOM AI CHATBOT VIEW (MULTI-CHAT) -->
-        <section id="view-chat" class="hidden space-y-4">
+        <!-- 4. BLOOM AI MULTI-CHAT VIEW (CLEAN GEMINI-STYLE INPUT) -->
+        <section id="view-chat" class="hidden">
             <div class="bg-slate-900/90 border border-white/10 rounded-3xl shadow-2xl flex flex-col md:flex-row h-[78vh] overflow-hidden backdrop-blur-xl">
                 
-                <!-- LEFT SIDEBAR: CONVERSATION LIST -->
-                <div class="w-full md:w-72 bg-slate-950/60 border-b md:border-b-0 md:border-r border-white/10 p-4 flex flex-col justify-between">
+                <!-- LEFT SIDEBAR: CONVERSATIONS -->
+                <div class="w-full md:w-68 lg:w-72 bg-slate-950/60 border-b md:border-b-0 md:border-r border-white/10 p-4 flex flex-col justify-between shrink-0">
                     <div class="space-y-3">
                         <div class="flex items-center justify-between">
                             <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Your Chats</span>
@@ -273,53 +217,24 @@
                                 <span>New Chat</span>
                             </button>
                         </div>
-                        <div id="chat-sessions-list" class="space-y-1.5 overflow-y-auto max-h-32 md:max-h-[58vh] pr-1">
-                            <!-- Chat threads render here -->
-                        </div>
+                        <div id="chat-sessions-list" class="space-y-1.5 overflow-y-auto max-h-28 md:max-h-[58vh] pr-1"></div>
                     </div>
-                    <div class="hidden md:block pt-4 border-t border-white/5 text-[11px] text-slate-500 text-center">
-                        Powered by Gemini • Private per user
+                    <div class="hidden md:block pt-3 border-t border-white/5 text-[11px] text-slate-500 text-center">
+                        Powered by Gemini • Multimodal AI
                     </div>
                 </div>
-                <!-- CHAT FORM WITH MULTIMODAL & VOICE CONTROLS -->
-<div class="space-y-2 pt-2 border-t border-white/10">
-    <!-- Attached Files Preview Tray -->
-    <div id="chat-attachments-preview" class="hidden flex flex-wrap gap-2 px-1"></div>
-
-    <form id="chat-form" onsubmit="handleSendMessage(event)" autocomplete="off" class="flex items-center space-x-2">
-        <!-- Hidden File Input (Images, Docs, Code) -->
-        <input type="file" id="chat-file-input" accept="image/*,application/pdf,.txt,.js,.csv" multiple class="hidden" onchange="handleFileSelection(event)">
-
-        <!-- Attachment Button -->
-        <button type="button" onclick="document.getElementById('chat-file-input').click()" class="p-3 rounded-2xl bg-slate-950 border border-white/15 text-slate-400 hover:text-white hover:border-rose-500 transition-all" title="Upload image or file">
-            <i data-lucide="paperclip" class="w-4 h-4"></i>
-        </button>
-
-        <!-- Microphone Voice Input Button -->
-        <button type="button" id="mic-btn" onclick="toggleVoiceRecording()" class="p-3 rounded-2xl bg-slate-950 border border-white/15 text-slate-400 hover:text-white hover:border-rose-500 transition-all" title="Voice prompt via microphone">
-            <i data-lucide="mic" class="w-4 h-4"></i>
-        </button>
-
-        <!-- Text Input -->
-        <input type="text" id="chat-input" name="bloom_chat_query" autocomplete="off" autocorrect="off" spellcheck="true" placeholder="Ask for advice, upload a file, or tap the mic..." class="flex-grow bg-slate-950 border border-white/15 rounded-2xl px-5 py-3 text-sm text-white focus:outline-none focus:border-rose-500 transition-colors">
-
-        <!-- Send Button -->
-        <button type="submit" class="px-5 py-3 rounded-2xl bg-gradient-to-r from-rose-500 to-purple-600 hover:from-rose-600 hover:to-purple-700 text-white font-semibold flex items-center justify-center transition-all shadow-lg shadow-purple-500/20">
-            <i data-lucide="send" class="w-4 h-4"></i>
-        </button>
-    </form>
-</div>
 
                 <!-- RIGHT SIDE: ACTIVE CHAT WINDOW -->
-                <div class="flex-grow flex flex-col p-4 md:p-6 bg-slate-900/40 min-h-0">
-                    <div class="flex items-center justify-between pb-4 border-b border-white/10">
-                        <div class="flex items-center space-x-3">
-                            <div class="p-2.5 rounded-2xl bg-gradient-to-tr from-rose-500 to-purple-600 text-white shadow-md">
-                                <i data-lucide="bot" class="w-6 h-6"></i>
+                <div class="flex-grow flex flex-col p-4 md:p-6 bg-slate-900/40 min-h-0 min-w-0">
+                    <!-- Chat Header -->
+                    <div class="flex items-center justify-between pb-3 border-b border-white/10 shrink-0">
+                        <div class="flex items-center space-x-3 min-w-0">
+                            <div class="p-2 rounded-2xl bg-gradient-to-tr from-rose-500 to-purple-600 text-white shadow-md shrink-0">
+                                <i data-lucide="bot" class="w-5 h-5"></i>
                             </div>
-                            <div>
-                                <h2 id="active-chat-title" class="font-bold text-white text-lg leading-tight truncate max-w-[200px] sm:max-w-md">New Conversation</h2>
-                                <p class="text-xs text-rose-400 flex items-center space-x-1">
+                            <div class="min-w-0">
+                                <h2 id="active-chat-title" class="font-bold text-white text-base sm:text-lg leading-tight truncate">New Conversation</h2>
+                                <p class="text-xs text-rose-400 flex items-center space-x-1.5">
                                     <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block"></span>
                                     <span>Active AI Session</span>
                                 </p>
@@ -330,47 +245,103 @@
                     <!-- Messages Feed -->
                     <div id="chat-messages" class="flex-grow overflow-y-auto my-4 space-y-4 pr-2">
                         <div class="flex items-start space-x-3">
-                            <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300">
+                            <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
                                 <i data-lucide="flower-2" class="w-4 h-4"></i>
                             </div>
                             <div class="bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 text-sm leading-relaxed">
-                                Hey there. 👋 I’m Bloom. Click <strong>+ New Chat</strong> or type below to start a conversation!
+                                Hey there. 👋 I’m Bloom. Ask me anything, upload an image or file, or ask me to create a visual roadmap!
                             </div>
                         </div>
                     </div>
 
                     <!-- Quick Prompts -->
-                    <div class="flex gap-2 overflow-x-auto pb-3 text-xs">
-                        <button onclick="sendQuickPrompt('I feel exhausted balancing school and my job.')" class="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:border-rose-500 text-slate-300 whitespace-nowrap transition-colors">
-                            😫 Balancing school & job
+                    <div class="flex gap-2 overflow-x-auto pb-3 text-xs shrink-0">
+                        <button type="button" onclick="sendQuickPrompt('Create a detailed step-by-step roadmap for balancing school, work, and mental health.')" class="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:border-rose-500 text-slate-300 whitespace-nowrap transition-colors">
+                            🗺️ School & work roadmap
                         </button>
-                        <button onclick="sendQuickPrompt('I feel like no adults understand what I go through.')" class="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:border-rose-500 text-slate-300 whitespace-nowrap transition-colors">
-                            🗣️ Nobody understands me
-                        </button>
-                        <button onclick="sendQuickPrompt('Give me a quick 2-minute tip to stop procrastinating.')" class="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:border-rose-500 text-slate-300 whitespace-nowrap transition-colors">
-                            ⚡ Quick anti-procrastination tip
+                        <button type="button" onclick="sendQuickPrompt('Give me a deep, practical breakdown on how to stop procrastinating and build momentum.')" class="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:border-rose-500 text-slate-300 whitespace-nowrap transition-colors">
+                            ⚡ Beat procrastination
                         </button>
                     </div>
 
-                    <!-- Input Form -->
-                    <form id="chat-form" onsubmit="handleSendMessage(event)" class="flex space-x-2 pt-2 border-t border-white/10">
-                        <input type="text" id="chat-input" placeholder="Express yourself or ask for advice..." class="flex-grow bg-slate-950 border border-white/15 rounded-2xl px-5 py-3 text-sm text-white focus:outline-none focus:border-rose-500 transition-colors">
-                        <button type="submit" class="px-5 py-3 rounded-2xl bg-gradient-to-r from-rose-500 to-purple-600 hover:from-rose-600 hover:to-purple-700 text-white font-semibold flex items-center justify-center transition-all shadow-lg shadow-purple-500/20">
-                            <i data-lucide="send" class="w-4 h-4"></i>
-                        </button>
-                    </form>
+                    <!-- UNIFIED GEMINI-STYLE PROMPT BOX -->
+                    <div class="space-y-2 pt-2 border-t border-white/10 shrink-0">
+                        <!-- File Preview Chips -->
+                        <div id="chat-attachments-preview" class="hidden flex flex-wrap gap-2"></div>
+
+                        <form id="chat-form" onsubmit="handleSendMessage(event)" autocomplete="off" class="flex items-center bg-slate-950 border border-white/15 rounded-2xl px-2 py-1.5 focus-within:border-rose-500 transition-colors shadow-inner">
+                            <!-- Hidden File Picker -->
+                            <input type="file" id="chat-file-input" accept="image/*,application/pdf,.txt,.js,.csv,.md" multiple class="hidden" onchange="handleFileSelection(event)">
+
+                            <!-- Plus Button Inside Input Box -->
+                            <button type="button" onclick="document.getElementById('chat-file-input').click()" class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors shrink-0" title="Add image or file">
+                                <i data-lucide="plus" class="w-4 h-4"></i>
+                            </button>
+
+                            <!-- Text Input -->
+                            <input type="text" id="chat-input" name="bloom_chat_prompt_field" autocomplete="off" autocorrect="off" spellcheck="true" placeholder="Ask Bloom anything..." class="flex-grow min-w-0 bg-transparent border-none px-2.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none">
+
+                            <!-- Microphone Button Inside Input Box -->
+                            <button type="button" id="mic-btn" onclick="toggleVoiceRecording()" class="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-white/10 transition-colors shrink-0 mr-1" title="Use microphone">
+                                <i data-lucide="mic" class="w-4 h-4"></i>
+                            </button>
+
+                            <!-- Send Button -->
+                            <button type="submit" class="p-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-purple-600 hover:from-rose-600 hover:to-purple-700 text-white font-semibold flex items-center justify-center transition-all shadow-md shadow-purple-500/20 shrink-0" title="Send">
+                                <i data-lucide="send" class="w-4 h-4"></i>
+                            </button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </section>
 
     </main>
 
-    <!-- FOOTER -->
-    <footer class="border-t border-white/10 py-6 text-center text-xs text-slate-500">
-        <p>© 2026 Bloom Platform • Empowering Gen-Z Through Thoughtful Design</p>
-    </footer>
+    <!-- MOBILE BOTTOM NAVIGATION -->
+    <div class="md:hidden fixed bottom-14 left-0 right-0 z-30 bg-slate-950/95 border-t border-white/10 px-6 py-2.5 flex justify-around backdrop-blur-xl">
+        <button id="mnav-home" onclick="switchTab('home')" class="text-rose-400 flex flex-col items-center gap-1 text-[10px] font-semibold">
+            <i data-lucide="home" class="w-4 h-4"></i>
+            <span>Home</span>
+        </button>
+        <button id="mnav-tasks" onclick="switchTab('tasks')" class="text-slate-400 flex flex-col items-center gap-1 text-[10px] font-semibold">
+            <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+            <span>Tasks</span>
+        </button>
+        <button id="mnav-learn" onclick="switchTab('learn')" class="text-slate-400 flex flex-col items-center gap-1 text-[10px] font-semibold">
+            <i data-lucide="book-open" class="w-4 h-4"></i>
+            <span>Library</span>
+        </button>
+        <button id="mnav-chat" onclick="switchTab('chat')" class="text-slate-400 flex flex-col items-center gap-1 text-[10px] font-semibold">
+            <i data-lucide="sparkles" class="w-4 h-4"></i>
+            <span>Bloom AI</span>
+        </button>
+    </div>
 
-    <!-- EXTERNAL JS -->
+    <!-- FLOATING FOCUS RADIO PLAYER -->
+    <div class="fixed bottom-0 left-0 right-0 z-40 bg-slate-950/90 border-t border-white/10 px-4 py-2 backdrop-blur-xl">
+        <div class="max-w-6xl mx-auto flex items-center justify-between gap-3">
+            <div class="flex items-center space-x-2.5">
+                <button onclick="toggleMusic()" class="p-2 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 hover:bg-rose-500 hover:text-white transition-all">
+                    <i id="music-icon" data-lucide="play" class="w-3.5 h-3.5"></i>
+                </button>
+                <span class="text-xs font-semibold text-slate-300 hidden sm:inline">Focus Radio</span>
+                <select id="music-station" onchange="changeStation()" class="bg-slate-900 border border-white/10 rounded-lg px-2.5 py-1 text-xs text-slate-300 focus:outline-none">
+                    <option value="https://streams.ilovemusic.de/iloveradio17.mp3">Chill Lo-Fi Beats</option>
+                    <option value="https://ice1.somafm.com/groovesalad-128-mp3">Ambient Groove</option>
+                    <option value="https://ice1.somafm.com/dronezone-128-mp3">Deep Study Space</option>
+                </select>
+            </div>
+            <div class="flex items-center space-x-2">
+                <i data-lucide="volume-2" class="w-3.5 h-3.5 text-slate-400"></i>
+                <input type="range" id="music-volume" min="0" max="1" step="0.05" value="0.4" oninput="setMusicVolume(this.value)" class="w-20 accent-rose-500">
+            </div>
+        </div>
+        <audio id="bg-audio" preload="none" onerror="handleAudioError()">
+            <source id="bg-audio-source" src="https://streams.ilovemusic.de/iloveradio17.mp3" type="audio/mpeg">
+        </audio>
+    </div>
+
     <script src="script.js"></script>
 </body>
 </html>

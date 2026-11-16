@@ -699,105 +699,6 @@ async function handleSendMessage(e) {
     lucide.createIcons();
 }
 
-    if (!currentSessionId) {
-        await createNewChatSession();
-    }
-
-    const chatContainer = document.getElementById('chat-messages');
-
-    // Save user message
-    await supabaseClient.from('chat_messages').insert([{
-        session_id: currentSessionId,
-        user_id: session.user.id,
-        role: 'user',
-        content: text
-    }]);
-
-    // Auto-name the chat after the first message
-    const activeSession = chatSessions.find(s => s.id === currentSessionId);
-    if (activeSession && activeSession.title === 'New Conversation') {
-        const newTitle = text.length > 26 ? text.substring(0, 26) + '...' : text;
-        await supabaseClient.from('chat_sessions').update({ title: newTitle }).eq('id', currentSessionId);
-        activeSession.title = newTitle;
-        renderChatSessionsList();
-        const titleEl = document.getElementById('active-chat-title');
-        if (titleEl) titleEl.innerText = newTitle;
-    }
-
-    chatContainer.insertAdjacentHTML('beforeend', `
-        <div class="flex items-start justify-end space-x-3">
-            <div class="bg-rose-600 text-white p-4 rounded-2xl rounded-tr-none max-w-[85%] text-sm leading-relaxed shadow-md">
-                ${text}
-            </div>
-        </div>
-    `);
-    input.value = '';
-    chatContainer.scrollTop = chatContainer.scrollHeight;
-
-    const typingId = 'typing-' + Date.now();
-    chatContainer.insertAdjacentHTML('beforeend', `
-        <div id="${typingId}" class="flex items-start space-x-3">
-            <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300">
-                <i data-lucide="flower-2" class="w-4 h-4 animate-spin"></i>
-            </div>
-            <div class="bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none text-slate-400 text-sm">
-                Bloom is thinking...
-            </div>
-        </div>
-    `);
-    chatContainer.scrollTop = chatContainer.scrollHeight;
-    lucide.createIcons();
-
-    try {
-        const systemPrompt = `You are Bloom, a warm, empathetic, and modern AI companion for teenagers and young adults navigating school, jobs, and mental health. Keep responses concise, supportive, and practical.\n\nUser says: ${text}`;
-
-        const { data, error } = await supabaseClient.functions.invoke('gemini-proxy', {
-            body: { prompt: systemPrompt }
-        });
-
-        document.getElementById(typingId)?.remove();
-        if (error) throw error;
-        if (data?.error) throw new Error(data.error.message || JSON.stringify(data.error));
-
-        const aiReply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "I'm right here with you. Take a deep breath!";
-
-        // Save AI reply
-        await supabaseClient.from('chat_messages').insert([{
-            session_id: currentSessionId,
-            user_id: session.user.id,
-            role: 'assistant',
-            content: aiReply
-        }]);
-
-        chatContainer.insertAdjacentHTML('beforeend', `
-            <div class="flex items-start space-x-3">
-                <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300">
-                    <i data-lucide="flower-2" class="w-4 h-4"></i>
-                </div>
-                <div class="bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 text-sm leading-relaxed whitespace-pre-line">
-                    ${aiReply}
-                </div>
-            </div>
-        `);
-    } catch (err) {
-        document.getElementById(typingId)?.remove();
-        console.error("AI Chat Error:", err);
-        chatContainer.insertAdjacentHTML('beforeend', `
-            <div class="flex items-start space-x-3">
-                <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300">
-                    <i data-lucide="alert-circle" class="w-4 h-4"></i>
-                </div>
-                <div class="bg-slate-800/80 border border-rose-500/30 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-rose-200 text-sm leading-relaxed">
-                    Connection error: ${err.message}
-                </div>
-            </div>
-        `);
-    }
-
-    chatContainer.scrollTop = chatContainer.scrollHeight;
-    lucide.createIcons();
-}
-
 // --- SUPABASE AUTHENTICATION & PASSWORD RECOVERY LOGIC ---
 let isSignUpMode = false;
 
@@ -873,4 +774,159 @@ async function handleUpdatePassword(e) {
         switchTab('tasks');
     } catch (err) {
         errorBox.innerText = err.message;
-        errorBox.classList.remove('hidden
+        errorBox.classList.add('hidden');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerText = 'Save New Password';
+    }
+}
+
+async function handleAuthSubmit(e) {
+    e.preventDefault();
+    const email = document.getElementById('auth-email').value;
+    const password = document.getElementById('auth-password').value;
+    const errorBox = document.getElementById('auth-error');
+    const successBox = document.getElementById('auth-success');
+    const submitBtn = document.getElementById('auth-submit-btn');
+
+    errorBox.classList.add('hidden');
+    if (successBox) successBox.classList.add('hidden');
+    submitBtn.disabled = true;
+    submitBtn.innerText = 'Processing...';
+
+    try {
+        let result;
+        if (isSignUpMode) {
+            result = await supabaseClient.auth.signUp({ email, password });
+        } else {
+            result = await supabaseClient.auth.signInWithPassword({ email, password });
+        }
+
+        if (result.error) throw result.error;
+
+        updateAuthUI(result.data.user);
+        switchTab('tasks');
+    } catch (err) {
+        errorBox.innerText = err.message;
+        errorBox.classList.remove('hidden');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerText = isSignUpMode ? 'Sign Up' : 'Sign In';
+    }
+}
+
+async function handleLogout() {
+    await supabaseClient.auth.signOut();
+    updateAuthUI(null);
+    switchTab('home');
+}
+
+function updateAuthUI(user) {
+    const authBtn = document.getElementById('auth-nav-btn');
+    if (!authBtn) return;
+
+    if (user) {
+        authBtn.innerHTML = '<i data-lucide="log-out" class="w-4 h-4"></i><span>Log Out</span>';
+        authBtn.onclick = handleLogout;
+        authBtn.classList.add('border-rose-500/40', 'text-rose-300');
+    } else {
+        authBtn.innerHTML = '<i data-lucide="log-in" class="w-4 h-4"></i><span>Log In</span>';
+        authBtn.onclick = () => switchTab('auth');
+        authBtn.classList.remove('border-rose-500/40', 'text-rose-300');
+    }
+    lucide.createIcons();
+}
+
+// --- AD-FREE BACKGROUND FOCUS MUSIC PLAYER ---
+let isMusicPlaying = false;
+
+function toggleMusic() {
+    const audio = document.getElementById('bg-audio');
+    const icon = document.getElementById('music-icon');
+    if (!audio || !icon) return;
+
+    if (isMusicPlaying) {
+        audio.pause();
+        isMusicPlaying = false;
+        icon.setAttribute('data-lucide', 'play');
+    } else {
+        audio.volume = document.getElementById('music-volume')?.value || 0.4;
+        audio.play().then(() => {
+            isMusicPlaying = true;
+            icon.setAttribute('data-lucide', 'pause');
+            lucide.createIcons();
+        }).catch(err => {
+            console.error("Audio playback error:", err);
+            alert("Stream is buffering or temporarily unavailable. Try switching stations!");
+        });
+    }
+    lucide.createIcons();
+}
+
+function changeStation() {
+    const audio = document.getElementById('bg-audio');
+    const source = document.getElementById('bg-audio-source');
+    const stationSelect = document.getElementById('music-station');
+    if (!audio || !source || !stationSelect) return;
+
+    source.src = stationSelect.value;
+    audio.load();
+
+    if (isMusicPlaying) {
+        audio.play().catch(err => {
+            console.error("Stream switch error:", err);
+            isMusicPlaying = false;
+            document.getElementById('music-icon')?.setAttribute('data-lucide', 'play');
+            lucide.createIcons();
+        });
+    }
+}
+
+function setMusicVolume(val) {
+    const audio = document.getElementById('bg-audio');
+    if (audio) audio.volume = val;
+}
+
+function handleAudioError() {
+    console.warn("Audio stream connection error encountered.");
+    isMusicPlaying = false;
+    const icon = document.getElementById('music-icon');
+    if (icon) {
+        icon.setAttribute('data-lucide', 'play');
+        lucide.createIcons();
+    }
+}
+
+// Listen for auth state changes (Login, Logout, Password Recovery)
+supabaseClient.auth.onAuthStateChange((event, session) => {
+    if (event === 'PASSWORD_RECOVERY') {
+        switchTab('auth');
+        document.getElementById('auth-title').innerText = 'Reset Your Password';
+        document.getElementById('auth-subtitle').innerText = 'Enter a new password for your Bloom account.';
+        document.getElementById('auth-form').classList.add('hidden');
+        document.getElementById('auth-footer-toggle').classList.add('hidden');
+        document.getElementById('reset-password-form').classList.remove('hidden');
+    } else {
+        updateAuthUI(session?.user || null);
+        fetchTasks();
+        loadChatSessions();
+    }
+});
+
+// INITIALIZATION ON DOM LOAD
+document.addEventListener('DOMContentLoaded', () => {
+    console.log("Bloom application initialized.");
+    lucide.createIcons();
+    fetchTasks();
+    loadChatSessions();
+    switchCategory('career');
+
+    const taskForm = document.getElementById('task-form');
+    if (taskForm) {
+        taskForm.addEventListener('submit', handleAddTask);
+    }
+
+    supabaseClient.auth.getSession().then(({ data: { session } }) => {
+        updateAuthUI(session?.user || null);
+    });
+});

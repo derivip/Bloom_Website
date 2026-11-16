@@ -600,6 +600,119 @@ async function handleSendMessage(e) {
         content: text
     }]);
 
+    // AI-generated smart title on the first message
+    const activeSession = chatSessions.find(s => s.id === currentSessionId);
+    if (activeSession && activeSession.title === 'New Conversation') {
+        try {
+            const titlePrompt = `Generate a short, punchy 2 to 4 word title summarizing this user question: "${text}". Return ONLY the title text with no quotes, punctuation, or extra words.`;
+            const { data: titleData } = await supabaseClient.functions.invoke('gemini-proxy', {
+                body: { prompt: titlePrompt }
+            });
+            const generatedTitle = titleData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || (text.length > 25 ? text.substring(0, 25) + '...' : text);
+            
+            await supabaseClient.from('chat_sessions').update({ title: generatedTitle }).eq('id', currentSessionId);
+            activeSession.title = generatedTitle;
+            renderChatSessionsList();
+            const titleEl = document.getElementById('active-chat-title');
+            if (titleEl) titleEl.innerText = generatedTitle;
+        } catch (err) {
+            console.warn("Auto-title generation error, using fallback:", err);
+            const fallbackTitle = text.length > 25 ? text.substring(0, 25) + '...' : text;
+            await supabaseClient.from('chat_sessions').update({ title: fallbackTitle }).eq('id', currentSessionId);
+            activeSession.title = fallbackTitle;
+            renderChatSessionsList();
+        }
+    }
+
+    chatContainer.insertAdjacentHTML('beforeend', `
+        <div class="flex items-start justify-end space-x-3">
+            <div class="bg-rose-600 text-white p-4 rounded-2xl rounded-tr-none max-w-[85%] text-sm leading-relaxed shadow-md">
+                ${text}
+            </div>
+        </div>
+    `);
+    input.value = '';
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+
+    const typingId = 'typing-' + Date.now();
+    chatContainer.insertAdjacentHTML('beforeend', `
+        <div id="${typingId}" class="flex items-start space-x-3">
+            <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300">
+                <i data-lucide="flower-2" class="w-4 h-4 animate-spin"></i>
+            </div>
+            <div class="bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none text-slate-400 text-sm">
+                Bloom is thinking...
+            </div>
+        </div>
+    `);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+    lucide.createIcons();
+
+    try {
+        const currentDateStr = new Date().toLocaleString();
+        const systemPrompt = `You are Bloom, an advanced, deeply supportive, and intelligent AI companion for teenagers and young adults navigating school, jobs, and mental health. Provide rich, detailed, natural, and actionable guidance without robotic placeholders or rigid constraints. Current date and time: ${currentDateStr}.\n\nUser says: ${text}`;
+
+        const { data, error } = await supabaseClient.functions.invoke('gemini-proxy', {
+            body: { prompt: systemPrompt }
+        });
+
+        document.getElementById(typingId)?.remove();
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error.message || JSON.stringify(data.error));
+
+        const aiReply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "I'm right here with you. Take a deep breath!";
+
+        // Save AI reply
+        await supabaseClient.from('chat_messages').insert([{
+            session_id: currentSessionId,
+            user_id: session.user.id,
+            role: 'assistant',
+            content: aiReply
+        }]);
+
+        chatContainer.insertAdjacentHTML('beforeend', `
+            <div class="flex items-start space-x-3">
+                <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300">
+                    <i data-lucide="flower-2" class="w-4 h-4"></i>
+                </div>
+                <div class="bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 text-sm leading-relaxed whitespace-pre-line">
+                    ${aiReply}
+                </div>
+            </div>
+        `);
+    } catch (err) {
+        document.getElementById(typingId)?.remove();
+        console.error("AI Chat Error:", err);
+        chatContainer.insertAdjacentHTML('beforeend', `
+            <div class="flex items-start space-x-3">
+                <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300">
+                    <i data-lucide="alert-circle" class="w-4 h-4"></i>
+                </div>
+                <div class="bg-slate-800/80 border border-rose-500/30 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-rose-200 text-sm leading-relaxed">
+                    Connection error: ${err.message}
+                </div>
+            </div>
+        `);
+    }
+
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+    lucide.createIcons();
+}
+
+    if (!currentSessionId) {
+        await createNewChatSession();
+    }
+
+    const chatContainer = document.getElementById('chat-messages');
+
+    // Save user message
+    await supabaseClient.from('chat_messages').insert([{
+        session_id: currentSessionId,
+        user_id: session.user.id,
+        role: 'user',
+        content: text
+    }]);
+
     // Auto-name the chat after the first message
     const activeSession = chatSessions.find(s => s.id === currentSessionId);
     if (activeSession && activeSession.title === 'New Conversation') {

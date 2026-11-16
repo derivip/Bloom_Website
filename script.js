@@ -598,6 +598,35 @@ async function handleSendMessage(e) {
         user_id: session.user.id,
         role: 'user',
         content: text
+        // Inside handleSendMessage, update the contents payload sent to Supabase Edge Function:
+    try {
+        const currentDateStr = new Date().toLocaleString();
+        
+        // Build multimodal parts array for Gemini
+        let contentParts = [
+            { text: `You are Bloom, an advanced, deeply supportive, and intelligent AI companion for teenagers and young adults navigating school, jobs, and mental health. Current date and time: ${currentDateStr}.\n\nUser says: ${text}` }
+        ];
+
+        // Attach files/images base64 data if any
+        if (attachedFiles.length > 0) {
+            attachedFiles.forEach(f => {
+                contentParts.push({
+                    inlineData: {
+                        mimeType: f.type,
+                        data: f.data
+                    }
+                });
+            });
+        }
+
+        const { data, error } = await supabaseClient.functions.invoke('gemini-proxy', {
+            body: { contents: [{ parts: contentParts }] }
+        });
+
+        // Clear attachments after sending
+        attachedFiles = [];
+        renderAttachmentsPreview();
+        document.getElementById('chat-file-input').value = '';
     }]);
 
     // AI-generated smart title on the first message
@@ -912,6 +941,113 @@ supabaseClient.auth.onAuthStateChange((event, session) => {
         loadChatSessions();
     }
 });
+// --- MULTIMODAL FILES & ATTACHMENTS STATE ---
+let attachedFiles = [];
+
+function handleFileSelection(e) {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+
+    files.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = function(uploadEvent) {
+            attachedFiles.push({
+                name: file.name,
+                type: file.type,
+                data: uploadEvent.target.result.split(',')[1] // Base64 data payload
+            });
+            renderAttachmentsPreview();
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+function renderAttachmentsPreview() {
+    const previewContainer = document.getElementById('chat-attachments-preview');
+    if (!previewContainer) return;
+
+    if (attachedFiles.length === 0) {
+        previewContainer.classList.add('hidden');
+        previewContainer.innerHTML = '';
+        return;
+    }
+
+    previewContainer.classList.remove('hidden');
+    previewContainer.innerHTML = attachedFiles.map((f, index) => `
+        <div class="flex items-center gap-2 bg-slate-950 border border-rose-500/30 px-3 py-1.5 rounded-xl text-xs text-slate-200">
+            <i data-lucide="${f.type.startsWith('image/') ? 'image' : 'file-text'}" class="w-3.5 h-3.5 text-rose-400"></i>
+            <span class="truncate max-w-[120px]">${f.name}</span>
+            <button type="button" onclick="removeAttachment(${index})" class="text-slate-500 hover:text-rose-400 ml-1">
+                <i data-lucide="x" class="w-3 h-3"></i>
+            </button>
+        </div>
+    `).join('');
+    lucide.createIcons();
+}
+
+function removeAttachment(index) {
+    attachedFiles.splice(index, 1);
+    renderAttachmentsPreview();
+}
+
+// --- MICROPHONE SPEECH-TO-TEXT VOICE PROMPTS ---
+let recognition = null;
+let isRecording = false;
+
+function toggleVoiceRecording() {
+    const micBtn = document.getElementById('mic-btn');
+    const input = document.getElementById('chat-input');
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        alert("Speech recognition is not supported in this browser. Try Chrome or Edge!");
+        return;
+    }
+
+    if (isRecording && recognition) {
+        recognition.stop();
+        return;
+    }
+
+    recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+        isRecording = true;
+        if (micBtn) {
+            micBtn.classList.add('bg-rose-500/30', 'border-rose-500', 'text-rose-300', 'animate-pulse');
+        }
+        if (input) input.placeholder = "Listening... Speak now...";
+    };
+
+    recognition.onresult = (event) => {
+        const speechText = event.results[0][0].transcript;
+        if (input) input.value = speechText;
+    };
+
+    recognition.onerror = (event) => {
+        console.error("Speech recognition error:", event.error);
+        stopVoiceUI();
+    };
+
+    recognition.onend = () => {
+        stopVoiceUI();
+    };
+
+    recognition.start();
+}
+
+function stopVoiceUI() {
+    isRecording = false;
+    const micBtn = document.getElementById('mic-btn');
+    const input = document.getElementById('chat-input');
+    if (micBtn) {
+        micBtn.classList.remove('bg-rose-500/30', 'border-rose-500', 'text-rose-300', 'animate-pulse');
+    }
+    if (input) input.placeholder = "Ask for advice, upload a file, or tap the mic...";
+}
 
 // INITIALIZATION ON DOM LOAD
 document.addEventListener('DOMContentLoaded', () => {

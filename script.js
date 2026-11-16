@@ -385,6 +385,190 @@ function switchCategory(cat) {
 }
 
 // --- EXPLORE BLOOM AI CHATBOT (POWERED BY GEMINI EDGE FUNCTION) ---
+// --- EXPLORE BLOOM AI MULTI-CHAT SYSTEM ---
+let currentSessionId = null;
+let chatSessions = [];
+
+async function loadChatSessions() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const listContainer = document.getElementById('chat-sessions-list');
+    const chatContainer = document.getElementById('chat-messages');
+
+    if (!session) {
+        chatSessions = [];
+        currentSessionId = null;
+        if (listContainer) {
+            listContainer.innerHTML = `<p class="text-xs text-slate-400 p-2">Log in to save and switch between chats.</p>`;
+        }
+        if (chatContainer) {
+            chatContainer.innerHTML = `
+                <div class="text-center py-12 space-y-3">
+                    <p class="text-slate-400 text-sm">Please log in to chat with Bloom AI.</p>
+                    <button onclick="switchTab('auth')" class="px-4 py-2 rounded-xl bg-rose-500 text-white text-xs font-semibold hover:bg-rose-600 transition-colors">
+                        Log In Now
+                    </button>
+                </div>
+            `;
+        }
+        return;
+    }
+
+    const { data, error } = await supabaseClient
+        .from('chat_sessions')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        console.error("Error loading chat sessions:", error);
+        return;
+    }
+
+    chatSessions = data || [];
+    renderChatSessionsList();
+
+    if (chatSessions.length > 0 && !currentSessionId) {
+        selectChatSession(chatSessions[0].id);
+    } else if (chatSessions.length === 0) {
+        await createNewChatSession();
+    }
+}
+
+function renderChatSessionsList() {
+    const listContainer = document.getElementById('chat-sessions-list');
+    if (!listContainer) return;
+
+    if (chatSessions.length === 0) {
+        listContainer.innerHTML = `<p class="text-xs text-slate-500 px-2 py-1">No chats yet.</p>`;
+        return;
+    }
+
+    listContainer.innerHTML = chatSessions.map(s => `
+        <div onclick="selectChatSession('${s.id}')" class="group flex items-center justify-between p-2.5 rounded-xl text-xs font-medium cursor-pointer transition-all ${s.id === currentSessionId ? 'bg-rose-500/20 border border-rose-500/40 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'}">
+            <span class="truncate max-w-[160px]">${s.title}</span>
+            <button onclick="deleteChatSession(event, '${s.id}')" class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-rose-400 p-1 transition-opacity" title="Delete chat">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            </button>
+        </div>
+    `).join('');
+    lucide.createIcons();
+}
+
+async function createNewChatSession() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) {
+        alert("Please log in to create a chat.");
+        switchTab('auth');
+        return;
+    }
+
+    const { data, error } = await supabaseClient
+        .from('chat_sessions')
+        .insert([{ user_id: session.user.id, title: 'New Conversation' }])
+        .select()
+        .single();
+
+    if (error) {
+        console.error("Error creating session:", error);
+        return;
+    }
+
+    chatSessions.unshift(data);
+    selectChatSession(data.id);
+    renderChatSessionsList();
+}
+
+async function selectChatSession(sessionId) {
+    currentSessionId = sessionId;
+    renderChatSessionsList();
+
+    const activeSession = chatSessions.find(s => s.id === sessionId);
+    const titleEl = document.getElementById('active-chat-title');
+    if (titleEl && activeSession) {
+        titleEl.innerText = activeSession.title;
+    }
+
+    const chatContainer = document.getElementById('chat-messages');
+    if (!chatContainer) return;
+
+    chatContainer.innerHTML = `<div class="text-center text-xs text-slate-500 py-4">Loading conversation...</div>`;
+
+    const { data, error } = await supabaseClient
+        .from('chat_messages')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('created_at', { ascending: true });
+
+    if (error) {
+        console.error("Error loading messages:", error);
+        return;
+    }
+
+    if (!data || data.length === 0) {
+        chatContainer.innerHTML = `
+            <div class="flex items-start space-x-3">
+                <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300">
+                    <i data-lucide="flower-2" class="w-4 h-4"></i>
+                </div>
+                <div class="bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 text-sm leading-relaxed">
+                    Hey there. 👋 I’m Bloom. What’s on your mind today?
+                </div>
+            </div>
+        `;
+    } else {
+        chatContainer.innerHTML = data.map(m => {
+            if (m.role === 'user') {
+                return `
+                    <div class="flex items-start justify-end space-x-3">
+                        <div class="bg-rose-600 text-white p-4 rounded-2xl rounded-tr-none max-w-[85%] text-sm leading-relaxed shadow-md">
+                            ${m.content}
+                        </div>
+                    </div>
+                `;
+            } else {
+                return `
+                    <div class="flex items-start space-x-3">
+                        <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300">
+                            <i data-lucide="flower-2" class="w-4 h-4"></i>
+                        </div>
+                        <div class="bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 text-sm leading-relaxed whitespace-pre-line">
+                            ${m.content}
+                        </div>
+                    </div>
+                `;
+            }
+        }).join('');
+    }
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+    lucide.createIcons();
+}
+
+async function deleteChatSession(event, sessionId) {
+    event.stopPropagation();
+    if (!confirm("Delete this chat conversation?")) return;
+
+    const { error } = await supabaseClient
+        .from('chat_sessions')
+        .delete()
+        .eq('id', sessionId);
+
+    if (error) {
+        console.error("Error deleting session:", error);
+        return;
+    }
+
+    chatSessions = chatSessions.filter(s => s.id !== sessionId);
+    if (currentSessionId === sessionId) {
+        currentSessionId = null;
+        if (chatSessions.length > 0) {
+            selectChatSession(chatSessions[0].id);
+        } else {
+            await createNewChatSession();
+        }
+    } else {
+        renderChatSessionsList();
+    }
+}
+
 function sendQuickPrompt(promptText) {
     document.getElementById('chat-input').value = promptText;
     handleSendMessage(new Event('submit'));
@@ -396,21 +580,50 @@ async function handleSendMessage(e) {
     const text = input.value.trim();
     if (!text) return;
 
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) {
+        alert("Please log in to chat.");
+        switchTab('auth');
+        return;
+    }
+
+    if (!currentSessionId) {
+        await createNewChatSession();
+    }
+
     const chatContainer = document.getElementById('chat-messages');
 
-    const userMsgHtml = `
+    // Save user message
+    await supabaseClient.from('chat_messages').insert([{
+        session_id: currentSessionId,
+        user_id: session.user.id,
+        role: 'user',
+        content: text
+    }]);
+
+    // Auto-name the chat after the first message
+    const activeSession = chatSessions.find(s => s.id === currentSessionId);
+    if (activeSession && activeSession.title === 'New Conversation') {
+        const newTitle = text.length > 26 ? text.substring(0, 26) + '...' : text;
+        await supabaseClient.from('chat_sessions').update({ title: newTitle }).eq('id', currentSessionId);
+        activeSession.title = newTitle;
+        renderChatSessionsList();
+        const titleEl = document.getElementById('active-chat-title');
+        if (titleEl) titleEl.innerText = newTitle;
+    }
+
+    chatContainer.insertAdjacentHTML('beforeend', `
         <div class="flex items-start justify-end space-x-3">
             <div class="bg-rose-600 text-white p-4 rounded-2xl rounded-tr-none max-w-[85%] text-sm leading-relaxed shadow-md">
                 ${text}
             </div>
         </div>
-    `;
-    chatContainer.insertAdjacentHTML('beforeend', userMsgHtml);
+    `);
     input.value = '';
     chatContainer.scrollTop = chatContainer.scrollHeight;
 
     const typingId = 'typing-' + Date.now();
-    const typingHtml = `
+    chatContainer.insertAdjacentHTML('beforeend', `
         <div id="${typingId}" class="flex items-start space-x-3">
             <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300">
                 <i data-lucide="flower-2" class="w-4 h-4 animate-spin"></i>
@@ -419,8 +632,7 @@ async function handleSendMessage(e) {
                 Bloom is thinking...
             </div>
         </div>
-    `;
-    chatContainer.insertAdjacentHTML('beforeend', typingHtml);
+    `);
     chatContainer.scrollTop = chatContainer.scrollHeight;
     lucide.createIcons();
 
@@ -432,13 +644,20 @@ async function handleSendMessage(e) {
         });
 
         document.getElementById(typingId)?.remove();
-
         if (error) throw error;
         if (data?.error) throw new Error(data.error.message || JSON.stringify(data.error));
 
         const aiReply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "I'm right here with you. Take a deep breath!";
 
-        const aiMsgHtml = `
+        // Save AI reply
+        await supabaseClient.from('chat_messages').insert([{
+            session_id: currentSessionId,
+            user_id: session.user.id,
+            role: 'assistant',
+            content: aiReply
+        }]);
+
+        chatContainer.insertAdjacentHTML('beforeend', `
             <div class="flex items-start space-x-3">
                 <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300">
                     <i data-lucide="flower-2" class="w-4 h-4"></i>
@@ -447,12 +666,11 @@ async function handleSendMessage(e) {
                     ${aiReply}
                 </div>
             </div>
-        `;
-        chatContainer.insertAdjacentHTML('beforeend', aiMsgHtml);
+        `);
     } catch (err) {
         document.getElementById(typingId)?.remove();
         console.error("AI Chat Error:", err);
-        const errorMsgHtml = `
+        chatContainer.insertAdjacentHTML('beforeend', `
             <div class="flex items-start space-x-3">
                 <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300">
                     <i data-lucide="alert-circle" class="w-4 h-4"></i>
@@ -461,14 +679,12 @@ async function handleSendMessage(e) {
                     Connection error: ${err.message}
                 </div>
             </div>
-        `;
-        chatContainer.insertAdjacentHTML('beforeend', errorMsgHtml);
+        `);
     }
 
     chatContainer.scrollTop = chatContainer.scrollHeight;
     lucide.createIcons();
 }
-
 // --- SUPABASE AUTHENTICATION & PASSWORD RECOVERY LOGIC ---
 let isSignUpMode = false;
 
@@ -696,5 +912,72 @@ document.addEventListener('DOMContentLoaded', () => {
 
     supabaseClient.auth.getSession().then(({ data: { session } }) => {
         updateAuthUI(session?.user || null);
+        // Listen for auth state changes (Login, Logout, Password Recovery)
+supabaseClient.auth.onAuthStateChange((event, session) => {
+    if (event === 'PASSWORD_RECOVERY') {
+        switchTab('auth');
+        document.getElementById('auth-title').innerText = 'Reset Your Password';
+        document.getElementById('auth-subtitle').innerText = 'Enter a new password for your Bloom account.';
+        document.getElementById('auth-form').classList.add('hidden');
+        document.getElementById('auth-footer-toggle').classList.add('hidden');
+        document.getElementById('reset-password-form').classList.remove('hidden');
+    } else {
+        updateAuthUI(session?.user || null);
+        fetchTasks();
+        loadChatSessions();
+    }
+});
+
+// INITIALIZATION ON DOM LOAD
+document.addEventListener('DOMContentLoaded', () => {
+    console.log("Bloom application initialized.");
+    lucide.createIcons();
+    fetchTasks();
+    loadChatSessions();
+    switchCategory('career');
+
+    const taskForm = document.getElementById('task-form');
+    if (taskForm) {
+        taskForm.addEventListener('submit', handleAddTask);
+    }
+
+    supabaseClient.auth.getSession().then(({ data: { session } }) => {
+        updateAuthUI(session?.user || null);
+
+        // Listen for auth state changes (Login, Logout, Password Recovery)
+supabaseClient.auth.onAuthStateChange((event, session) => {
+    if (event === 'PASSWORD_RECOVERY') {
+        switchTab('auth');
+        document.getElementById('auth-title').innerText = 'Reset Your Password';
+        document.getElementById('auth-subtitle').innerText = 'Enter a new password for your Bloom account.';
+        document.getElementById('auth-form').classList.add('hidden');
+        document.getElementById('auth-footer-toggle').classList.add('hidden');
+        document.getElementById('reset-password-form').classList.remove('hidden');
+    } else {
+        updateAuthUI(session?.user || null);
+        fetchTasks();
+        loadChatSessions();
+    }
+});
+
+// INITIALIZATION ON DOM LOAD
+document.addEventListener('DOMContentLoaded', () => {
+    console.log("Bloom application initialized.");
+    lucide.createIcons();
+    fetchTasks();
+    loadChatSessions();
+    switchCategory('career');
+
+    const taskForm = document.getElementById('task-form');
+    if (taskForm) {
+        taskForm.addEventListener('submit', handleAddTask);
+    }
+
+    supabaseClient.auth.getSession().then(({ data: { session } }) => {
+        updateAuthUI(session?.user || null);
+    });
+});
+    });
+});
     });
 });

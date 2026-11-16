@@ -281,6 +281,34 @@
                         Powered by Gemini • Private per user
                     </div>
                 </div>
+                <!-- CHAT FORM WITH MULTIMODAL & VOICE CONTROLS -->
+<div class="space-y-2 pt-2 border-t border-white/10">
+    <!-- Attached Files Preview Tray -->
+    <div id="chat-attachments-preview" class="hidden flex flex-wrap gap-2 px-1"></div>
+
+    <form id="chat-form" onsubmit="handleSendMessage(event)" autocomplete="off" class="flex items-center space-x-2">
+        <!-- Hidden File Input (Images, Docs, Code) -->
+        <input type="file" id="chat-file-input" accept="image/*,application/pdf,.txt,.js,.csv" multiple class="hidden" onchange="handleFileSelection(event)">
+
+        <!-- Attachment Button -->
+        <button type="button" onclick="document.getElementById('chat-file-input').click()" class="p-3 rounded-2xl bg-slate-950 border border-white/15 text-slate-400 hover:text-white hover:border-rose-500 transition-all" title="Upload image or file">
+            <i data-lucide="paperclip" class="w-4 h-4"></i>
+        </button>
+
+        <!-- Microphone Voice Input Button -->
+        <button type="button" id="mic-btn" onclick="toggleVoiceRecording()" class="p-3 rounded-2xl bg-slate-950 border border-white/15 text-slate-400 hover:text-white hover:border-rose-500 transition-all" title="Voice prompt via microphone">
+            <i data-lucide="mic" class="w-4 h-4"></i>
+        </button>
+
+        <!-- Text Input -->
+        <input type="text" id="chat-input" name="bloom_chat_query" autocomplete="off" autocorrect="off" spellcheck="true" placeholder="Ask for advice, upload a file, or tap the mic..." class="flex-grow bg-slate-950 border border-white/15 rounded-2xl px-5 py-3 text-sm text-white focus:outline-none focus:border-rose-500 transition-colors">
+
+        <!-- Send Button -->
+        <button type="submit" class="px-5 py-3 rounded-2xl bg-gradient-to-r from-rose-500 to-purple-600 hover:from-rose-600 hover:to-purple-700 text-white font-semibold flex items-center justify-center transition-all shadow-lg shadow-purple-500/20">
+            <i data-lucide="send" class="w-4 h-4"></i>
+        </button>
+    </form>
+</div>
 
                 <!-- RIGHT SIDE: ACTIVE CHAT WINDOW -->
                 <div class="flex-grow flex flex-col p-4 md:p-6 bg-slate-900/40 min-h-0">

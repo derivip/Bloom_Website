@@ -802,20 +802,12 @@ Current date and time: ${currentDateStr}.
 
 User prompt: ${text || "Please analyze the attached file(s) thoroughly."}`;
 
-        let invokeBody;
+        let invokeBody = { prompt: elaborateInstruction };
         if (attachedFiles.length > 0) {
-            const contentParts = [{ text: elaborateInstruction }];
-            attachedFiles.forEach(f => {
-                contentParts.push({
-                    inlineData: {
-                        mimeType: f.type,
-                        data: f.data
-                    }
-                });
-            });
-            invokeBody = { contents: [{ parts: contentParts }] };
-        } else {
-            invokeBody = { prompt: elaborateInstruction };
+            invokeBody.files = attachedFiles.map(f => ({
+                mimeType: f.type,
+                data: f.data
+            }));
         }
 
         const { data, error } = await supabaseClient.functions.invoke('gemini-proxy', {
@@ -831,7 +823,7 @@ User prompt: ${text || "Please analyze the attached file(s) thoroughly."}`;
         if (error) throw error;
         if (data?.error) throw new Error(data.error.message || JSON.stringify(data.error));
 
-        const aiReply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "I'm right here with you. Let's explore this together step by step.";
+        const aiReply = data?.candidates?.[0]?.content?.parts?.[0]?.text || data?.reply || "I'm right here with you. Let's explore this together step by step.";
 
         await supabaseClient.from('chat_messages').insert([{
             session_id: currentSessionId,
@@ -979,7 +971,7 @@ async function handleAuthSubmit(e) {
         switchTab('tasks');
     } catch (err) {
         errorBox.innerText = err.message;
-        errorBox.classList.remove('hidden');
+        errorBox.classList.add('hidden');
     } finally {
         submitBtn.disabled = false;
         submitBtn.innerText = isSignUpMode ? 'Sign Up' : 'Sign In';

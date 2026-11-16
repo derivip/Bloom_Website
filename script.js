@@ -735,7 +735,8 @@ async function handleSendMessage(e) {
     const chatContainer = document.getElementById('chat-messages');
     const attachedNames = attachedFiles.map(f => f.name).join(', ');
     const displayPrompt = text
-        ? (attachedNames ? `${text} [Attached: ${attachedNames}]` : text) : `[Attached: ${attachedNames}]`;
+        ? (attachedNames ? `${text} [Attached: ${attachedNames}]` : text)
+        : `[Attached: ${attachedNames}]`;
 
     // Save user message
     await supabaseClient.from('chat_messages').insert([{
@@ -791,4 +792,304 @@ async function handleSendMessage(e) {
 
     try {
         const currentDateStr = new Date().toLocaleString();
-        const elaborateInstruction = `You are Bloom, an advanced, deeply insightful, empathetic, and comprehensive AI mentor for
+        const elaborateInstruction = `You are Bloom, an advanced, deeply insightful, empathetic, and comprehensive AI mentor for teenagers and young adults navigating school, work, personal growth, and mental health.
+CRITICAL RESPONSE DEPTH RULES:
+- Provide thorough, multi-paragraph, well-structured, and deeply thoughtful responses. Never give short 1-2 sentence answers unless explicitly asked for a single word.
+- Break down complex concepts with clear headings or bullet points, real-world examples, psychological/practical reasoning, and concrete next steps.
+- If the user uploads an image or file, analyze every detail carefully and provide a complete breakdown.
+- VISUAL ROADMAPS: Whenever the user asks for a roadmap, flowchart, timeline, mind map, or visual diagram, generate a clean Mermaid.js diagram wrapped inside \`\`\`mermaid and \`\`\` code fences (keep node labels simple without parentheses or quotes inside brackets).
+Current date and time: ${currentDateStr}.
+
+User prompt: ${text || "Please analyze the attached file(s) thoroughly."}`;
+
+        let invokeBody = { prompt: elaborateInstruction };
+        if (attachedFiles.length > 0) {
+            invokeBody.files = attachedFiles.map(f => ({
+                mimeType: f.type,
+                data: f.data
+            }));
+        }
+
+        const { data, error } = await supabaseClient.functions.invoke('gemini-proxy', {
+            body: invokeBody
+        });
+
+        attachedFiles = [];
+        renderAttachmentsPreview();
+        const fileInput = document.getElementById('chat-file-input');
+        if (fileInput) fileInput.value = '';
+
+        document.getElementById(typingId)?.remove();
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error.message || JSON.stringify(data.error));
+
+        const aiReply = data?.candidates?.[0]?.content?.parts?.[0]?.text || data?.reply || "I'm right here with you. Let's explore this together step by step.";
+
+        await supabaseClient.from('chat_messages').insert([{
+            session_id: currentSessionId,
+            user_id: session.user.id,
+            role: 'assistant',
+            content: aiReply
+        }]);
+
+        chatContainer.insertAdjacentHTML('beforeend', `
+            <div class="flex items-start space-x-3">
+                <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
+                    <i data-lucide="flower-2" class="w-4 h-4"></i>
+                </div>
+                <div class="bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 text-sm leading-relaxed whitespace-pre-line">
+                    ${formatAiMessageContent(aiReply)}
+                </div>
+            </div>
+        `);
+    } catch (err) {
+        document.getElementById(typingId)?.remove();
+        console.error("AI Chat Error:", err);
+        chatContainer.insertAdjacentHTML('beforeend', `
+            <div class="flex items-start space-x-3">
+                <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
+                    <i data-lucide="alert-circle" class="w-4 h-4"></i>
+                </div>
+                <div class="bg-slate-800/80 border border-rose-500/30 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-rose-200 text-sm leading-relaxed">
+                    Connection error: ${err.message}
+                </div>
+            </div>
+        `);
+    }
+
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+    lucide.createIcons();
+    await renderDiagramsInChat();
+}
+
+// --- SUPABASE AUTHENTICATION & PASSWORD RECOVERY LOGIC ---
+let isSignUpMode = false;
+
+function toggleAuthMode() {
+    isSignUpMode = !isSignUpMode;
+    document.getElementById('auth-title').innerText = isSignUpMode ? 'Create Account' : 'Welcome Back';
+    document.getElementById('auth-subtitle').innerText = isSignUpMode
+        ? 'Join Bloom to organize your focus and peace of mind.'
+        : 'Sign in to sync your tasks and Bloom AI chats.';
+    document.getElementById('auth-submit-btn').innerText = isSignUpMode ? 'Sign Up' : 'Sign In';
+    document.getElementById('auth-toggle-btn').innerHTML = isSignUpMode
+        ? 'Already have an account? <span class="font-bold text-white">Sign In</span>'
+        : "Don't have an account? <span class=\"font-bold text-white\">Sign Up</span>";
+
+    const forgotLink = document.getElementById('forgot-pwd-link');
+    if (forgotLink) forgotLink.style.display = isSignUpMode ? 'none' : 'inline-block';
+
+    document.getElementById('auth-error').classList.add('hidden');
+    document.getElementById('auth-success')?.classList.add('hidden');
+}
+
+async function handleForgotPassword() {
+    const emailInput = document.getElementById('auth-email');
+    const errorBox = document.getElementById('auth-error');
+    const successBox = document.getElementById('auth-success');
+
+    errorBox.classList.add('hidden');
+    if (successBox) successBox.classList.add('hidden');
+
+    const email = emailInput.value.trim();
+    if (!email) {
+        errorBox.innerText = 'Please type your email address in the box above first, then click "Forgot password?".';
+        errorBox.classList.remove('hidden');
+        emailInput.focus();
+        return;
+    }
+
+    try {
+        const redirectUrl = window.location.origin + window.location.pathname;
+        const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+            redirectTo: redirectUrl
+        });
+
+        if (error) throw error;
+
+        if (successBox) {
+            successBox.innerText = 'Password reset link sent! Check your email inbox (and spam folder).';
+            successBox.classList.remove('hidden');
+        }
+    } catch (err) {
+        errorBox.innerText = err.message;
+        errorBox.classList.add('hidden');
+    }
+}
+
+async function handleUpdatePassword(e) {
+    e.preventDefault();
+    const newPassword = document.getElementById('new-password').value;
+    const errorBox = document.getElementById('reset-error');
+    const submitBtn = document.getElementById('reset-submit-btn');
+
+    errorBox.classList.add('hidden');
+    submitBtn.disabled = true;
+    submitBtn.innerText = 'Updating...';
+
+    try {
+        const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+        if (error) throw error;
+
+        document.getElementById('reset-password-form').classList.add('hidden');
+        document.getElementById('auth-form').classList.remove('hidden');
+        document.getElementById('auth-footer-toggle').classList.remove('hidden');
+        switchTab('tasks');
+    } catch (err) {
+        errorBox.innerText = err.message;
+        errorBox.classList.add('hidden');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerText = 'Save New Password';
+    }
+}
+
+async function handleAuthSubmit(e) {
+    e.preventDefault();
+    const email = document.getElementById('auth-email').value;
+    const password = document.getElementById('auth-password').value;
+    const errorBox = document.getElementById('auth-error');
+    const successBox = document.getElementById('auth-success');
+    const submitBtn = document.getElementById('auth-submit-btn');
+
+    errorBox.classList.add('hidden');
+    if (successBox) successBox.classList.add('hidden');
+    submitBtn.disabled = true;
+    submitBtn.innerText = 'Processing...';
+
+    try {
+        let result;
+        if (isSignUpMode) {
+            result = await supabaseClient.auth.signUp({ email, password });
+        } else {
+            result = await supabaseClient.auth.signInWithPassword({ email, password });
+        }
+
+        if (result.error) throw result.error;
+
+        updateAuthUI(result.data.user);
+        switchTab('tasks');
+    } catch (err) {
+        errorBox.innerText = err.message;
+        errorBox.classList.add('hidden');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerText = isSignUpMode ? 'Sign Up' : 'Sign In';
+    }
+}
+
+async function handleLogout() {
+    await supabaseClient.auth.signOut();
+    updateAuthUI(null);
+    switchTab('home');
+}
+
+function updateAuthUI(user) {
+    const authBtn = document.getElementById('auth-nav-btn');
+    if (!authBtn) return;
+
+    if (user) {
+        authBtn.innerHTML = '<i data-lucide="log-out" class="w-4 h-4"></i><span>Log Out</span>';
+        authBtn.onclick = handleLogout;
+        authBtn.classList.add('border-rose-500/40', 'text-rose-300');
+    } else {
+        authBtn.innerHTML = '<i data-lucide="log-in" class="w-4 h-4"></i><span>Log In</span>';
+        authBtn.onclick = () => switchTab('auth');
+        authBtn.classList.remove('border-rose-500/40', 'text-rose-300');
+    }
+    lucide.createIcons();
+}
+
+// --- AD-FREE BACKGROUND FOCUS MUSIC PLAYER ---
+let isMusicPlaying = false;
+
+function toggleMusic() {
+    const audio = document.getElementById('bg-audio');
+    const icon = document.getElementById('music-icon');
+    if (!audio || !icon) return;
+
+    if (isMusicPlaying) {
+        audio.pause();
+        isMusicPlaying = false;
+        icon.setAttribute('data-lucide', 'play');
+    } else {
+        audio.volume = document.getElementById('music-volume')?.value || 0.4;
+        audio.play().then(() => {
+            isMusicPlaying = true;
+            icon.setAttribute('data-lucide', 'pause');
+            lucide.createIcons();
+        }).catch(err => {
+            console.error("Audio playback error:", err);
+            alert("Stream is buffering or temporarily unavailable. Try switching stations!");
+        });
+    }
+    lucide.createIcons();
+}
+
+function changeStation() {
+    const audio = document.getElementById('bg-audio');
+    const source = document.getElementById('bg-audio-source');
+    const stationSelect = document.getElementById('music-station');
+    if (!audio || !source || !stationSelect) return;
+
+    source.src = stationSelect.value;
+    audio.load();
+
+    if (isMusicPlaying) {
+        audio.play().catch(err => {
+            console.error("Stream switch error:", err);
+            isMusicPlaying = false;
+            document.getElementById('music-icon')?.setAttribute('data-lucide', 'play');
+            lucide.createIcons();
+        });
+    }
+}
+
+function setMusicVolume(val) {
+    const audio = document.getElementById('bg-audio');
+    if (audio) audio.volume = val;
+}
+
+function handleAudioError() {
+    console.warn("Audio stream connection error encountered.");
+    isMusicPlaying = false;
+    const icon = document.getElementById('music-icon');
+    if (icon) {
+        icon.setAttribute('data-lucide', 'play');
+        lucide.createIcons();
+    }
+}
+
+// Listen for auth state changes (Login, Logout, Password Recovery)
+supabaseClient.auth.onAuthStateChange((event, session) => {
+    if (event === 'PASSWORD_RECOVERY') {
+        switchTab('auth');
+        document.getElementById('auth-title').innerText = 'Reset Your Password';
+        document.getElementById('auth-subtitle').innerText = 'Enter a new password for your Bloom account.';
+        document.getElementById('auth-form').classList.add('hidden');
+        document.getElementById('auth-footer-toggle').classList.add('hidden');
+        document.getElementById('reset-password-form').classList.remove('hidden');
+    } else {
+        updateAuthUI(session?.user || null);
+        fetchTasks();
+        loadChatSessions();
+    }
+});
+
+// INITIALIZATION ON DOM LOAD
+document.addEventListener('DOMContentLoaded', () => {
+    console.log("Bloom application initialized.");
+    lucide.createIcons();
+    fetchTasks();
+    loadChatSessions();
+    switchCategory('career');
+
+    const taskForm = document.getElementById('task-form');
+    if (taskForm) {
+        taskForm.addEventListener('submit', handleAddTask);
+    }
+
+    supabaseClient.auth.getSession().then(({ data: { session } }) => {
+        updateAuthUI(session?.user || null);
+    });
+});

@@ -1,4 +1,4 @@
-// BLOOM APPLICATION SCRIPT (2026 EDITION - SUPABASE, GEMINI AI, AUTH, MULTI-CHAT & FOCUS RADIO)
+// BLOOM APPLICATION SCRIPT (2026 EDITION - SUPABASE, GEMINI AI, MULTIMODAL, MULTI-CHAT & FOCUS RADIO)
 
 // SUPABASE CONFIGURATION
 const SUPABASE_URL = 'https://xmqmrkqyjnbupyalhnib.supabase.co';
@@ -6,6 +6,11 @@ const SUPABASE_ANON_KEY = 'sb_publishable_7AqK322TINFq1y39lMgvTw_Z7Itc79G';
 
 // Initialize Supabase Client
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Initialize Mermaid for visual roadmaps & diagrams
+if (window.mermaid) {
+    mermaid.initialize({ startOnLoad: false, theme: 'dark' });
+}
 
 // --- TASK MANAGEMENT WITH SUPABASE (PER-USER ISOLATED) ---
 let tasks = [];
@@ -384,6 +389,142 @@ function switchCategory(cat) {
     `).join('');
 }
 
+// --- MULTIMODAL FILE ATTACHMENTS & VOICE INPUT ---
+let attachedFiles = [];
+
+function handleFileSelection(e) {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+
+    files.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = function(uploadEvent) {
+            attachedFiles.push({
+                name: file.name,
+                type: file.type || 'text/plain',
+                data: uploadEvent.target.result.split(',')[1]
+            });
+            renderAttachmentsPreview();
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+function renderAttachmentsPreview() {
+    const previewContainer = document.getElementById('chat-attachments-preview');
+    if (!previewContainer) return;
+
+    if (attachedFiles.length === 0) {
+        previewContainer.classList.add('hidden');
+        previewContainer.innerHTML = '';
+        return;
+    }
+
+    previewContainer.classList.remove('hidden');
+    previewContainer.innerHTML = attachedFiles.map((f, index) => `
+        <div class="flex items-center gap-2 bg-slate-950 border border-rose-500/30 px-3 py-1.5 rounded-xl text-xs text-slate-200">
+            <i data-lucide="${f.type.startsWith('image/') ? 'image' : 'file-text'}" class="w-3.5 h-3.5 text-rose-400"></i>
+            <span class="truncate max-w-[140px]">${f.name}</span>
+            <button type="button" onclick="removeAttachment(${index})" class="text-slate-500 hover:text-rose-400 ml-1">
+                <i data-lucide="x" class="w-3 h-3"></i>
+            </button>
+        </div>
+    `).join('');
+    lucide.createIcons();
+}
+
+function removeAttachment(index) {
+    attachedFiles.splice(index, 1);
+    renderAttachmentsPreview();
+}
+
+let recognition = null;
+let isRecording = false;
+
+function toggleVoiceRecording() {
+    const micBtn = document.getElementById('mic-btn');
+    const input = document.getElementById('chat-input');
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        alert("Speech recognition is not supported in this browser. Try Chrome or Edge!");
+        return;
+    }
+
+    if (isRecording && recognition) {
+        recognition.stop();
+        return;
+    }
+
+    recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+        isRecording = true;
+        if (micBtn) {
+            micBtn.classList.add('bg-rose-500/20', 'text-rose-400', 'animate-pulse');
+        }
+        if (input) input.placeholder = "Listening... Speak now...";
+    };
+
+    recognition.onresult = (event) => {
+        const speechText = event.results[0][0].transcript;
+        if (input) {
+            input.value = input.value ? `${input.value} ${speechText}` : speechText;
+        }
+    };
+
+    recognition.onerror = (event) => {
+        console.error("Speech recognition error:", event.error);
+        stopVoiceUI();
+    };
+
+    recognition.onend = () => {
+        stopVoiceUI();
+    };
+
+    recognition.start();
+}
+
+function stopVoiceUI() {
+    isRecording = false;
+    const micBtn = document.getElementById('mic-btn');
+    const input = document.getElementById('chat-input');
+    if (micBtn) {
+        micBtn.classList.remove('bg-rose-500/20', 'text-rose-400', 'animate-pulse');
+    }
+    if (input) input.placeholder = "Ask Bloom anything...";
+}
+
+// --- DIAGRAM & MESSAGE FORMATTER ---
+function formatAiMessageContent(rawText) {
+    const mermaidRegex = /```mermaid\s*([\s\S]*?)```/g;
+    return rawText.replace(mermaidRegex, (match, code) => {
+        const cleanCode = code.trim();
+        return `
+            <div class="my-3 p-4 rounded-2xl bg-slate-950 border border-rose-500/30 overflow-x-auto shadow-inner">
+                <div class="text-[10px] font-bold uppercase tracking-wider text-rose-400 mb-2 flex items-center gap-1.5">
+                    <i data-lucide="git-branch" class="w-3.5 h-3.5"></i>
+                    <span>Bloom Visual Roadmap</span>
+                </div>
+                <div class="mermaid flex justify-center">${cleanCode}</div>
+            </div>
+        `;
+    });
+}
+
+async function renderDiagramsInChat() {
+    if (window.mermaid) {
+        try {
+            await mermaid.run({ querySelector: '#chat-messages .mermaid' });
+        } catch (err) {
+            console.warn("Diagram render warning:", err);
+        }
+    }
+}
+
 // --- EXPLORE BLOOM AI MULTI-CHAT SYSTEM ---
 let currentSessionId = null;
 let chatSessions = [];
@@ -505,11 +646,11 @@ async function selectChatSession(sessionId) {
     if (!data || data.length === 0) {
         chatContainer.innerHTML = `
             <div class="flex items-start space-x-3">
-                <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300">
+                <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
                     <i data-lucide="flower-2" class="w-4 h-4"></i>
                 </div>
                 <div class="bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 text-sm leading-relaxed">
-                    Hey there. 👋 I’m Bloom. What’s on your mind today?
+                    Hey there. 👋 I’m Bloom. Ask me anything, upload an image or file, or ask me to create a visual roadmap!
                 </div>
             </div>
         `;
@@ -526,11 +667,11 @@ async function selectChatSession(sessionId) {
             } else {
                 return `
                     <div class="flex items-start space-x-3">
-                        <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300">
+                        <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
                             <i data-lucide="flower-2" class="w-4 h-4"></i>
                         </div>
                         <div class="bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 text-sm leading-relaxed whitespace-pre-line">
-                            ${m.content}
+                            ${formatAiMessageContent(m.content)}
                         </div>
                     </div>
                 `;
@@ -539,6 +680,7 @@ async function selectChatSession(sessionId) {
     }
     chatContainer.scrollTop = chatContainer.scrollHeight;
     lucide.createIcons();
+    await renderDiagramsInChat();
 }
 
 async function deleteChatSession(event, sessionId) {
@@ -577,7 +719,7 @@ async function handleSendMessage(e) {
     e.preventDefault();
     const input = document.getElementById('chat-input');
     const text = input.value.trim();
-    if (!text) return;
+    if (!text && attachedFiles.length === 0) return;
 
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session) {
@@ -591,53 +733,28 @@ async function handleSendMessage(e) {
     }
 
     const chatContainer = document.getElementById('chat-messages');
+    const attachedNames = attachedFiles.map(f => f.name).join(', ');
+    const displayPrompt = text
+        ? (attachedNames ? `${text} [Attached: ${attachedNames}]` : text)
+        : `[Attached: ${attachedNames}]`;
 
     // Save user message
     await supabaseClient.from('chat_messages').insert([{
         session_id: currentSessionId,
         user_id: session.user.id,
         role: 'user',
-        content: text
-        // Inside handleSendMessage, update the contents payload sent to Supabase Edge Function:
-    try {
-        const currentDateStr = new Date().toLocaleString();
-        
-        // Build multimodal parts array for Gemini
-        let contentParts = [
-            { text: `You are Bloom, an advanced, deeply supportive, and intelligent AI companion for teenagers and young adults navigating school, jobs, and mental health. Current date and time: ${currentDateStr}.\n\nUser says: ${text}` }
-        ];
-
-        // Attach files/images base64 data if any
-        if (attachedFiles.length > 0) {
-            attachedFiles.forEach(f => {
-                contentParts.push({
-                    inlineData: {
-                        mimeType: f.type,
-                        data: f.data
-                    }
-                });
-            });
-        }
-
-        const { data, error } = await supabaseClient.functions.invoke('gemini-proxy', {
-            body: { contents: [{ parts: contentParts }] }
-        });
-
-        // Clear attachments after sending
-        attachedFiles = [];
-        renderAttachmentsPreview();
-        document.getElementById('chat-file-input').value = '';
+        content: displayPrompt
     }]);
 
-    // AI-generated smart title on the first message
+    // AI-generated smart title on first message
     const activeSession = chatSessions.find(s => s.id === currentSessionId);
     if (activeSession && activeSession.title === 'New Conversation') {
         try {
-            const titlePrompt = `Generate a short, punchy 2 to 4 word title summarizing this user question: "${text}". Return ONLY the title text with no quotes, punctuation, or extra words.`;
+            const titlePrompt = `Generate a short, punchy 2 to 4 word title summarizing this user prompt: "${displayPrompt}". Return ONLY the title text with no quotes, punctuation, or extra words.`;
             const { data: titleData } = await supabaseClient.functions.invoke('gemini-proxy', {
                 body: { prompt: titlePrompt }
             });
-            const generatedTitle = titleData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || (text.length > 25 ? text.substring(0, 25) + '...' : text);
+            const generatedTitle = titleData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || (displayPrompt.length > 25 ? displayPrompt.substring(0, 25) + '...' : displayPrompt);
             
             await supabaseClient.from('chat_sessions').update({ title: generatedTitle }).eq('id', currentSessionId);
             activeSession.title = generatedTitle;
@@ -645,18 +762,14 @@ async function handleSendMessage(e) {
             const titleEl = document.getElementById('active-chat-title');
             if (titleEl) titleEl.innerText = generatedTitle;
         } catch (err) {
-            console.warn("Auto-title generation error, using fallback:", err);
-            const fallbackTitle = text.length > 25 ? text.substring(0, 25) + '...' : text;
-            await supabaseClient.from('chat_sessions').update({ title: fallbackTitle }).eq('id', currentSessionId);
-            activeSession.title = fallbackTitle;
-            renderChatSessionsList();
+            console.warn("Auto-title generation error:", err);
         }
     }
 
     chatContainer.insertAdjacentHTML('beforeend', `
         <div class="flex items-start justify-end space-x-3">
             <div class="bg-rose-600 text-white p-4 rounded-2xl rounded-tr-none max-w-[85%] text-sm leading-relaxed shadow-md">
-                ${text}
+                ${displayPrompt}
             </div>
         </div>
     `);
@@ -666,11 +779,11 @@ async function handleSendMessage(e) {
     const typingId = 'typing-' + Date.now();
     chatContainer.insertAdjacentHTML('beforeend', `
         <div id="${typingId}" class="flex items-start space-x-3">
-            <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300">
+            <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
                 <i data-lucide="flower-2" class="w-4 h-4 animate-spin"></i>
             </div>
             <div class="bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none text-slate-400 text-sm">
-                Bloom is thinking...
+                Bloom is thinking deeply...
             </div>
         </div>
     `);
@@ -679,19 +792,47 @@ async function handleSendMessage(e) {
 
     try {
         const currentDateStr = new Date().toLocaleString();
-        const systemPrompt = `You are Bloom, an advanced, deeply supportive, and intelligent AI companion for teenagers and young adults navigating school, jobs, and mental health. Provide rich, detailed, natural, and actionable guidance without robotic placeholders or rigid constraints. Current date and time: ${currentDateStr}.\n\nUser says: ${text}`;
+        const elaborateInstruction = `You are Bloom, an advanced, deeply insightful, empathetic, and comprehensive AI mentor for teenagers and young adults navigating school, work, personal growth, and mental health.
+CRITICAL RESPONSE DEPTH RULES:
+- Provide thorough, multi-paragraph, well-structured, and deeply thoughtful responses. Never give short 1-2 sentence answers unless explicitly asked for a single word.
+- Break down complex concepts with clear headings or bullet points, real-world examples, psychological/practical reasoning, and concrete next steps.
+- If the user uploads an image or file, analyze every detail carefully and provide a complete breakdown.
+- VISUAL ROADMAPS: Whenever the user asks for a roadmap, flowchart, timeline, mind map, or visual diagram, generate a clean Mermaid.js diagram wrapped inside \`\`\`mermaid and \`\`\` code fences (keep node labels simple without parentheses or quotes inside brackets).
+Current date and time: ${currentDateStr}.
+
+User prompt: ${text || "Please analyze the attached file(s) thoroughly."}`;
+
+        let invokeBody;
+        if (attachedFiles.length > 0) {
+            const contentParts = [{ text: elaborateInstruction }];
+            attachedFiles.forEach(f => {
+                contentParts.push({
+                    inlineData: {
+                        mimeType: f.type,
+                        data: f.data
+                    }
+                });
+            });
+            invokeBody = { contents: [{ parts: contentParts }] };
+        } else {
+            invokeBody = { prompt: elaborateInstruction };
+        }
 
         const { data, error } = await supabaseClient.functions.invoke('gemini-proxy', {
-            body: { prompt: systemPrompt }
+            body: invokeBody
         });
+
+        attachedFiles = [];
+        renderAttachmentsPreview();
+        const fileInput = document.getElementById('chat-file-input');
+        if (fileInput) fileInput.value = '';
 
         document.getElementById(typingId)?.remove();
         if (error) throw error;
         if (data?.error) throw new Error(data.error.message || JSON.stringify(data.error));
 
-        const aiReply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "I'm right here with you. Take a deep breath!";
+        const aiReply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "I'm right here with you. Let's explore this together step by step.";
 
-        // Save AI reply
         await supabaseClient.from('chat_messages').insert([{
             session_id: currentSessionId,
             user_id: session.user.id,
@@ -701,11 +842,11 @@ async function handleSendMessage(e) {
 
         chatContainer.insertAdjacentHTML('beforeend', `
             <div class="flex items-start space-x-3">
-                <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300">
+                <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
                     <i data-lucide="flower-2" class="w-4 h-4"></i>
                 </div>
                 <div class="bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 text-sm leading-relaxed whitespace-pre-line">
-                    ${aiReply}
+                    ${formatAiMessageContent(aiReply)}
                 </div>
             </div>
         `);
@@ -714,7 +855,7 @@ async function handleSendMessage(e) {
         console.error("AI Chat Error:", err);
         chatContainer.insertAdjacentHTML('beforeend', `
             <div class="flex items-start space-x-3">
-                <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300">
+                <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
                     <i data-lucide="alert-circle" class="w-4 h-4"></i>
                 </div>
                 <div class="bg-slate-800/80 border border-rose-500/30 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-rose-200 text-sm leading-relaxed">
@@ -726,6 +867,7 @@ async function handleSendMessage(e) {
 
     chatContainer.scrollTop = chatContainer.scrollHeight;
     lucide.createIcons();
+    await renderDiagramsInChat();
 }
 
 // --- SUPABASE AUTHENTICATION & PASSWORD RECOVERY LOGIC ---
@@ -803,7 +945,7 @@ async function handleUpdatePassword(e) {
         switchTab('tasks');
     } catch (err) {
         errorBox.innerText = err.message;
-        errorBox.classList.add('hidden');
+        errorBox.classList.remove('hidden');
     } finally {
         submitBtn.disabled = false;
         submitBtn.innerText = 'Save New Password';
@@ -941,113 +1083,6 @@ supabaseClient.auth.onAuthStateChange((event, session) => {
         loadChatSessions();
     }
 });
-// --- MULTIMODAL FILES & ATTACHMENTS STATE ---
-let attachedFiles = [];
-
-function handleFileSelection(e) {
-    const files = Array.from(e.target.files);
-    if (!files.length) return;
-
-    files.forEach(file => {
-        const reader = new FileReader();
-        reader.onload = function(uploadEvent) {
-            attachedFiles.push({
-                name: file.name,
-                type: file.type,
-                data: uploadEvent.target.result.split(',')[1] // Base64 data payload
-            });
-            renderAttachmentsPreview();
-        };
-        reader.readAsDataURL(file);
-    });
-}
-
-function renderAttachmentsPreview() {
-    const previewContainer = document.getElementById('chat-attachments-preview');
-    if (!previewContainer) return;
-
-    if (attachedFiles.length === 0) {
-        previewContainer.classList.add('hidden');
-        previewContainer.innerHTML = '';
-        return;
-    }
-
-    previewContainer.classList.remove('hidden');
-    previewContainer.innerHTML = attachedFiles.map((f, index) => `
-        <div class="flex items-center gap-2 bg-slate-950 border border-rose-500/30 px-3 py-1.5 rounded-xl text-xs text-slate-200">
-            <i data-lucide="${f.type.startsWith('image/') ? 'image' : 'file-text'}" class="w-3.5 h-3.5 text-rose-400"></i>
-            <span class="truncate max-w-[120px]">${f.name}</span>
-            <button type="button" onclick="removeAttachment(${index})" class="text-slate-500 hover:text-rose-400 ml-1">
-                <i data-lucide="x" class="w-3 h-3"></i>
-            </button>
-        </div>
-    `).join('');
-    lucide.createIcons();
-}
-
-function removeAttachment(index) {
-    attachedFiles.splice(index, 1);
-    renderAttachmentsPreview();
-}
-
-// --- MICROPHONE SPEECH-TO-TEXT VOICE PROMPTS ---
-let recognition = null;
-let isRecording = false;
-
-function toggleVoiceRecording() {
-    const micBtn = document.getElementById('mic-btn');
-    const input = document.getElementById('chat-input');
-
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-        alert("Speech recognition is not supported in this browser. Try Chrome or Edge!");
-        return;
-    }
-
-    if (isRecording && recognition) {
-        recognition.stop();
-        return;
-    }
-
-    recognition = new SpeechRecognition();
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-
-    recognition.onstart = () => {
-        isRecording = true;
-        if (micBtn) {
-            micBtn.classList.add('bg-rose-500/30', 'border-rose-500', 'text-rose-300', 'animate-pulse');
-        }
-        if (input) input.placeholder = "Listening... Speak now...";
-    };
-
-    recognition.onresult = (event) => {
-        const speechText = event.results[0][0].transcript;
-        if (input) input.value = speechText;
-    };
-
-    recognition.onerror = (event) => {
-        console.error("Speech recognition error:", event.error);
-        stopVoiceUI();
-    };
-
-    recognition.onend = () => {
-        stopVoiceUI();
-    };
-
-    recognition.start();
-}
-
-function stopVoiceUI() {
-    isRecording = false;
-    const micBtn = document.getElementById('mic-btn');
-    const input = document.getElementById('chat-input');
-    if (micBtn) {
-        micBtn.classList.remove('bg-rose-500/30', 'border-rose-500', 'text-rose-300', 'animate-pulse');
-    }
-    if (input) input.placeholder = "Ask for advice, upload a file, or tap the mic...";
-}
 
 // INITIALIZATION ON DOM LOAD
 document.addEventListener('DOMContentLoaded', () => {

@@ -458,22 +458,21 @@ function toggleVoiceRecording() {
 
     recognition = new SpeechRecognition();
     recognition.lang = 'en-US';
-    recognition.interimResults = false;
+    recognition.interimResults = true;
     recognition.maxAlternatives = 1;
 
     recognition.onstart = () => {
         isRecording = true;
-        if (micBtn) {
-            micBtn.classList.add('bg-rose-500/20', 'text-rose-400', 'animate-pulse');
-        }
+        if (micBtn) micBtn.classList.add('bg-rose-500/20', 'text-rose-400', 'animate-pulse');
         if (input) input.placeholder = "Listening... Speak now...";
     };
 
     recognition.onresult = (event) => {
-        const speechText = event.results[0][0].transcript;
-        if (input) {
-            input.value = input.value ? `${input.value} ${speechText}` : speechText;
+        let transcript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+            transcript += event.results[i][0].transcript;
         }
+        if (input) input.value = transcript;
     };
 
     recognition.onerror = (event) => {
@@ -483,6 +482,9 @@ function toggleVoiceRecording() {
 
     recognition.onend = () => {
         stopVoiceUI();
+        if (input && input.value.trim().length > 0) {
+            handleSendMessage(new Event('submit'));
+        }
     };
 
     recognition.start();
@@ -492,9 +494,7 @@ function stopVoiceUI() {
     isRecording = false;
     const micBtn = document.getElementById('mic-btn');
     const input = document.getElementById('chat-input');
-    if (micBtn) {
-        micBtn.classList.remove('bg-rose-500/20', 'text-rose-400', 'animate-pulse');
-    }
+    if (micBtn) micBtn.classList.remove('bg-rose-500/20', 'text-rose-400', 'animate-pulse');
     if (input) input.placeholder = "Ask Bloom anything...";
 }
 
@@ -716,9 +716,9 @@ function sendQuickPrompt(promptText) {
 }
 
 async function handleSendMessage(e) {
-    e.preventDefault();
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
     const input = document.getElementById('chat-input');
-    const text = input.value.trim();
+    const text = input ? input.value.trim() : '';
     if (!text && attachedFiles.length === 0) return;
 
     const { data: { session } } = await supabaseClient.auth.getSession();
@@ -773,7 +773,7 @@ async function handleSendMessage(e) {
             </div>
         </div>
     `);
-    input.value = '';
+    if (input) input.value = '';
     chatContainer.scrollTop = chatContainer.scrollHeight;
 
     const typingId = 'typing-' + Date.now();
@@ -971,7 +971,7 @@ async function handleAuthSubmit(e) {
         switchTab('tasks');
     } catch (err) {
         errorBox.innerText = err.message;
-        errorBox.classList.add('hidden');
+        errorBox.classList.remove('hidden');
     } finally {
         submitBtn.disabled = false;
         submitBtn.innerText = isSignUpMode ? 'Sign Up' : 'Sign In';

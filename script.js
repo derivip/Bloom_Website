@@ -389,25 +389,86 @@ function switchCategory(cat) {
     `).join('');
 }
 
-// --- MULTIMODAL FILE ATTACHMENTS & VOICE INPUT ---
+// --- MULTIMODAL FILE ATTACHMENTS (WITH FAST IMAGE COMPRESSION) & VOICE INPUT ---
 let attachedFiles = [];
 
-function handleFileSelection(e) {
-    const files = Array.from(e.target.files);
-    if (!files.length) return;
-
-    files.forEach(file => {
+function compressImage(file, maxWidth = 1024, quality = 0.8) {
+    return new Promise((resolve) => {
         const reader = new FileReader();
-        reader.onload = function(uploadEvent) {
-            attachedFiles.push({
-                name: file.name,
-                type: file.type || 'text/plain',
-                data: uploadEvent.target.result.split(',')[1]
-            });
-            renderAttachmentsPreview();
+        reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+                if (width > maxWidth) {
+                    height = Math.round((height * maxWidth) / width);
+                    width = maxWidth;
+                }
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                const dataUrl = canvas.toDataURL('image/jpeg', quality);
+                resolve({
+                    name: file.name,
+                    type: 'image/jpeg',
+                    data: dataUrl.split(',')[1]
+                });
+            };
+            img.src = event.target.result;
         };
         reader.readAsDataURL(file);
     });
+}
+
+function getFileMimeType(file) {
+    if (file.type) return file.type;
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    const map = {
+        txt: 'text/plain',
+        md: 'text/plain',
+        csv: 'text/csv',
+        js: 'text/javascript',
+        html: 'text/html',
+        css: 'text/css',
+        json: 'application/json',
+        pdf: 'application/pdf'
+    };
+    return map[ext] || 'text/plain';
+}
+
+async function handleFileSelection(e) {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+
+    for (const file of files) {
+        if (file.size > 8 * 1024 * 1024) {
+            alert(`"${file.name}" is larger than 8MB. Please pick a smaller file.`);
+            continue;
+        }
+
+        if (file.type.startsWith('image/')) {
+            const compressed = await compressImage(file);
+            attachedFiles.push(compressed);
+            renderAttachmentsPreview();
+        } else {
+            const mime = getFileMimeType(file);
+            await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (uploadEvent) => {
+                    attachedFiles.push({
+                        name: file.name,
+                        type: mime,
+                        data: uploadEvent.target.result.split(',')[1]
+                    });
+                    renderAttachmentsPreview();
+                    resolve();
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+    }
 }
 
 function renderAttachmentsPreview() {
@@ -638,23 +699,7 @@ async function selectChatSession(sessionId) {
         .eq('session_id', sessionId)
         .order('created_at', { ascending: true });
 
-    if (error) {
-        console.error("Error loading messages:", error);
-        chatContainer.innerHTML = `
-            <div class="flex items-start space-x-3">
-                <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
-                    <i data-lucide="flower-2" class="w-4 h-4"></i>
-                </div>
-                <div class="bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 text-sm leading-relaxed">
-                    Hey there. 👋 I’m Bloom. Ask me anything, upload an image or file, or ask me to create a visual roadmap!
-                </div>
-            </div>
-        `;
-        lucide.createIcons();
-        return;
-    }
-
-    if (!data || data.length === 0) {
+    if (error || !data || data.length === 0) {
         chatContainer.innerHTML = `
             <div class="flex items-start space-x-3">
                 <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
@@ -760,7 +805,7 @@ async function handleSendMessage(e) {
     if (input) input.value = '';
     chatContainer.scrollTop = chatContainer.scrollHeight;
 
-    // Save user message in background so a DB error never blocks the AI response
+    // Save user message in background
     if (currentSessionId) {
         supabaseClient.from('chat_messages').insert([{
             session_id: currentSessionId,
@@ -779,7 +824,7 @@ async function handleSendMessage(e) {
                 <i data-lucide="flower-2" class="w-4 h-4 animate-spin"></i>
             </div>
             <div class="bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none text-slate-400 text-sm">
-                Bloom is thinking deeply...
+                Bloom is thinking...
             </div>
         </div>
     `);
@@ -787,20 +832,14 @@ async function handleSendMessage(e) {
     lucide.createIcons();
 
     try {
-        const currentDateStr = new Date().toLocaleString();
-        const elaborateInstruction = `You are Bloom, an advanced, deeply insightful, empathetic, and comprehensive AI mentor for teenagers and young adults navigating school, work, personal growth, and mental health.
-CRITICAL RESPONSE DEPTH RULES:
-- Provide thorough, multi-paragraph, well-structured, and deeply thoughtful responses. Never give short 1-2 sentence answers unless explicitly asked for a single word.
-- Break down complex concepts with clear headings or bullet points, real-world examples, psychological/practical reasoning, and concrete next steps.
-- If the user uploads an image or file, analyze every detail carefully and provide a complete breakdown.
-- VISUAL ROADMAPS: Whenever the user asks for a roadmap, flowchart, timeline, mind map, or visual diagram, generate a clean Mermaid.js diagram wrapped inside \`\`\`mermaid and \`\`\` code fences (keep node labels simple without parentheses or quotes inside brackets).
-Current date and time: ${currentDateStr}.
+        const fastInstruction = `You are Bloom, an empathetic, practical AI mentor for teenagers and young adults navigating school, work, personal growth, and mental health. Give clear, helpful, well-structured answers with actionable next steps. If the user uploads an image or file, analyze it thoroughly. If asked for a roadmap or flowchart, include a clean \`\`\`mermaid diagram.
 
-User prompt: ${text || "Please analyze the attached file(s) thoroughly."}`;
+User prompt: ${text || "Please analyze the attached file(s)."}`;
 
-        let invokeBody = { prompt: elaborateInstruction };
+        let invokeBody = { prompt: fastInstruction };
         if (attachedFiles.length > 0) {
             invokeBody.files = attachedFiles.map(f => ({
+                name: f.name,
                 mimeType: f.type,
                 data: f.data
             }));
@@ -821,7 +860,6 @@ User prompt: ${text || "Please analyze the attached file(s) thoroughly."}`;
 
         const aiReply = data?.candidates?.[0]?.content?.parts?.[0]?.text || data?.reply || "I'm right here with you. Let's explore this together step by step.";
 
-        // Save assistant message safely in background
         if (currentSessionId) {
             supabaseClient.from('chat_messages').insert([{
                 session_id: currentSessionId,
@@ -833,7 +871,6 @@ User prompt: ${text || "Please analyze the attached file(s) thoroughly."}`;
             });
         }
 
-        // Smart auto-title on first message
         const activeSession = chatSessions.find(s => s.id === currentSessionId);
         if (activeSession && activeSession.title === 'New Conversation') {
             const shortTitle = displayPrompt.length > 28 ? displayPrompt.substring(0, 28) + '...' : displayPrompt;

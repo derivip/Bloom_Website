@@ -1,83 +1,43 @@
 /* =========================================================
-   BLOOM — MID-TONE TO DARKER EYE-COMFORT ANIMATED THEME
+   BLOOM — FULL-SPECTRUM MEDIUM-TO-DARK ANIMATED THEME
    ========================================================= */
 
 :root {
-  /* Default Palette: Mid-Slate & Twilight Indigo with Soft Rose/Sky/Violet Glow */
-  --bg-base: #131b2e;
-  --bg-gradient: linear-gradient(135deg, #162038 0%, #191d36 50%, #111a2e 100%);
-  --orb-1: rgba(244, 63, 94, 0.22);
-  --orb-2: rgba(56, 189, 248, 0.20);
-  --orb-3: rgba(168, 85, 247, 0.18);
-  --orb-4: rgba(251, 146, 60, 0.14);
-  --accent-glow: rgba(244, 63, 94, 0.25);
+  /* Spectrum stops kept in medium-to-dark saturation/lightness */
+  --spec-red: rgba(190, 45, 72, 0.28);
+  --spec-orange: rgba(194, 82, 28, 0.26);
+  --spec-yellow: rgba(176, 134, 24, 0.24);
+  --spec-green: rgba(24, 136, 96, 0.26);
+  --spec-cyan: rgba(20, 128, 168, 0.28);
+  --spec-blue: rgba(44, 78, 176, 0.28);
+  --spec-violet: rgba(118, 48, 168, 0.28);
 
-  --glass-bg: rgba(26, 36, 58, 0.68);
-  --glass-elevated: rgba(34, 47, 74, 0.80);
+  --bg-base: #111626;
+  --bg-spectrum: linear-gradient(
+    130deg,
+    #1a1426 0%,
+    #12212b 25%,
+    #1c182e 50%,
+    #112424 75%,
+    #1a1426 100%
+  );
+
+  --glass-bg: rgba(22, 30, 48, 0.66);
+  --glass-elevated: rgba(30, 40, 64, 0.80);
   --glass-border: rgba(255, 255, 255, 0.12);
 
   --text-primary: #f1f5f9;
   --text-secondary: #cbd5e1;
   --text-muted: #94a3b8;
-  --accent-heading: #fda4af;
-  --accent-table-head: rgba(244, 63, 94, 0.18);
-  --accent-table-text: #fecdd3;
-  --accent-code: #7dd3fc;
-}
-
-/* Preset 2: Mid-Teal & Slate Blue */
-[data-bloom-theme="cyber-mint"] {
-  --bg-base: #11222b;
-  --bg-gradient: linear-gradient(135deg, #132934 0%, #142236 50%, #0f1d29 100%);
-  --orb-1: rgba(16, 185, 129, 0.22);
-  --orb-2: rgba(14, 165, 233, 0.22);
-  --orb-3: rgba(45, 212, 191, 0.16);
-  --orb-4: rgba(59, 130, 246, 0.16);
-  --accent-glow: rgba(16, 185, 129, 0.26);
-  --glass-bg: rgba(20, 38, 49, 0.70);
-  --glass-elevated: rgba(27, 49, 63, 0.82);
-  --accent-heading: #6ee7b7;
-  --accent-table-head: rgba(16, 185, 129, 0.18);
-  --accent-table-text: #a7f3d0;
-  --accent-code: #67e8f9;
-}
-
-/* Preset 3: Warm Dusk Plum & Amber */
-[data-bloom-theme="gold-coral"] {
-  --bg-base: #211722;
-  --bg-gradient: linear-gradient(135deg, #261926 0%, #241b29 50%, #191522 100%);
-  --orb-1: rgba(251, 113, 133, 0.20);
-  --orb-2: rgba(250, 204, 21, 0.18);
-  --orb-3: rgba(249, 115, 22, 0.18);
-  --orb-4: rgba(192, 132, 252, 0.14);
-  --accent-glow: rgba(251, 146, 60, 0.24);
-  --glass-bg: rgba(38, 27, 40, 0.70);
-  --glass-elevated: rgba(49, 35, 52, 0.82);
-  --accent-heading: #fde047;
-  --accent-table-head: rgba(250, 204, 21, 0.16);
-  --accent-table-text: #fef08a;
-  --accent-code: #fdba74;
-}
-
-/* Preset 4: Twilight Indigo & Berry */
-[data-bloom-theme="indigo-neon"] {
-  --bg-base: #151329;
-  --bg-gradient: linear-gradient(135deg, #191633 0%, #1e1738 50%, #111024 100%);
-  --orb-1: rgba(236, 72, 153, 0.22);
-  --orb-2: rgba(99, 102, 241, 0.24);
-  --orb-3: rgba(192, 132, 252, 0.18);
-  --orb-4: rgba(56, 189, 248, 0.14);
-  --accent-glow: rgba(168, 85, 247, 0.28);
-  --glass-bg: rgba(27, 24, 52, 0.70);
-  --glass-elevated: rgba(36, 32, 68, 0.82);
-  --accent-heading: #f9a8d4;
-  --accent-table-head: rgba(236, 72, 153, 0.18);
-  --accent-table-text: #fbcfe8;
-  --accent-code: #c4b5fd;
+  --accent-heading: #e2e8f0;
+  --accent-table-head: rgba(148, 163, 184, 0.16);
+  --accent-table-text: #f1f5f9;
+  --accent-code: #93c5fd;
+  --accent-glow: rgba(99, 102, 241, 0.22);
 }
 
 /* =========================================================
-   BASE RESET & FULL-SCREEN MID-DARK ANIMATED BACKDROP
+   BASE RESET & FULL-SPECTRUM SHIFTING BASE
    ========================================================= */
 *,
 *::before,
@@ -93,9 +53,10 @@ body {
   font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   color: var(--text-primary) !important;
   background-color: var(--bg-base) !important;
-  background-image: var(--bg-gradient) !important;
+  background-image: var(--bg-spectrum) !important;
+  background-size: 320% 320% !important;
+  animation: bloomSpectrumBaseShift 36s ease-in-out infinite alternate;
   overflow-x: hidden;
-  transition: background-color 0.6s ease, background-image 0.6s ease, color 0.3s ease;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -103,32 +64,146 @@ body {
   position: relative;
 }
 
+/* Layer 1: Full-spectrum color sweep across the visual spectrum */
+body::before {
+  content: "";
+  position: fixed;
+  inset: -35%;
+  z-index: 0;
+  pointer-events: none;
+  background: conic-gradient(
+    from 0deg at 50% 50%,
+    var(--spec-red) 0deg 52deg,
+    var(--spec-orange) 52deg 104deg,
+    var(--spec-yellow) 104deg 156deg,
+    var(--spec-green) 156deg 208deg,
+    var(--spec-cyan) 208deg 260deg,
+    var(--spec-blue) 260deg 312deg,
+    var(--spec-violet) 312deg 360deg
+  );
+  filter: blur(78px);
+  opacity: 0.78;
+  animation: bloomFullSpectrumWheel 42s linear infinite;
+  will-change: transform, filter;
+}
+
+/* Layer 2: Soft ambient light motes */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(2.5px 2.5px at 16% 24%, rgba(255, 255, 255, 0.18), transparent 70%),
+    radial-gradient(3px 3px at 34% 72%, rgba(255, 255, 255, 0.16), transparent 70%),
+    radial-gradient(2px 2px at 56% 32%, rgba(255, 255, 255, 0.15), transparent 70%),
+    radial-gradient(3px 3px at 74% 68%, rgba(255, 255, 255, 0.18), transparent 70%),
+    radial-gradient(2.5px 2.5px at 86% 28%, rgba(255, 255, 255, 0.16), transparent 70%);
+  animation: bloomSpectrumMotes 18s ease-in-out infinite alternate;
+  will-change: transform, opacity;
+}
+
+/* Layer 3: Drifting multi-band spectrum clouds */
 .bloom-animated-bg {
   position: fixed;
-  inset: -20%;
-  width: 140vw;
-  height: 140vh;
+  inset: -25%;
+  width: 150vw;
+  height: 150vh;
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(circle at 18% 24%, var(--orb-1), transparent 46%),
-    radial-gradient(circle at 82% 26%, var(--orb-2), transparent 48%),
-    radial-gradient(circle at 30% 80%, var(--orb-3), transparent 52%),
-    radial-gradient(circle at 78% 76%, var(--orb-4), transparent 48%);
-  filter: blur(58px);
-  animation: bloomMidDrift 22s ease-in-out infinite alternate;
+    radial-gradient(circle at 18% 25%, var(--spec-red), transparent 44%),
+    radial-gradient(circle at 82% 28%, var(--spec-cyan), transparent 46%),
+    radial-gradient(circle at 32% 78%, var(--spec-green), transparent 48%),
+    radial-gradient(circle at 76% 76%, var(--spec-violet), transparent 46%);
+  filter: blur(60px);
+  animation:
+    bloomSpectrumCloudDrift 22s ease-in-out infinite alternate,
+    bloomSpectrumHueCycle 48s linear infinite;
+  will-change: transform, filter;
+}
+
+/* Layer 4: Secondary warm-to-cool spectrum wave */
+.bloom-animated-bg::after {
+  content: "";
+  position: absolute;
+  inset: 8%;
+  background:
+    radial-gradient(circle at 52% 28%, var(--spec-orange), transparent 42%),
+    radial-gradient(circle at 45% 72%, var(--spec-blue), transparent 46%),
+    radial-gradient(circle at 68% 48%, var(--spec-yellow), transparent 40%);
+  filter: blur(68px);
+  opacity: 0.72;
+  animation: bloomSpectrumCounterWave 26s ease-in-out infinite alternate;
   will-change: transform;
 }
 
-@keyframes bloomMidDrift {
+@keyframes bloomSpectrumBaseShift {
   0% {
-    transform: translate3d(-2.5%, -2%, 0) scale(1);
+    background-position: 0% 20%;
   }
   50% {
-    transform: translate3d(2.5%, 2%, 0) scale(1.06);
+    background-position: 100% 65%;
   }
   100% {
-    transform: translate3d(-1.5%, 2.5%, 0) scale(1.03);
+    background-position: 35% 100%;
+  }
+}
+
+@keyframes bloomFullSpectrumWheel {
+  0% {
+    transform: rotate(0deg) scale(1.08);
+  }
+  50% {
+    transform: rotate(180deg) scale(1.14);
+  }
+  100% {
+    transform: rotate(360deg) scale(1.08);
+  }
+}
+
+@keyframes bloomSpectrumCloudDrift {
+  0% {
+    transform: translate3d(-3%, -2%, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(3%, 2.5%, 0) scale(1.07);
+  }
+  100% {
+    transform: translate3d(-2%, 3%, 0) scale(1.04);
+  }
+}
+
+@keyframes bloomSpectrumHueCycle {
+  0% {
+    filter: blur(60px) hue-rotate(0deg);
+  }
+  100% {
+    filter: blur(60px) hue-rotate(360deg);
+  }
+}
+
+@keyframes bloomSpectrumCounterWave {
+  0% {
+    transform: translate3d(3.5%, 2.5%, 0) scale(1.04);
+  }
+  50% {
+    transform: translate3d(-3.5%, -2.5%, 0) scale(0.98);
+  }
+  100% {
+    transform: translate3d(2%, -3.5%, 0) scale(1.06);
+  }
+}
+
+@keyframes bloomSpectrumMotes {
+  0% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0.45;
+  }
+  100% {
+    transform: translate3d(-1.5%, -2.5%, 0);
+    opacity: 0.8;
   }
 }
 
@@ -138,7 +213,7 @@ body > :not(.bloom-animated-bg) {
 }
 
 /* =========================================================
-   FROSTED MID-TONE GLASS CARDS & SURFACE OVERRIDES
+   FROSTED GLASS SURFACES & READABILITY OVERRIDES
    ========================================================= */
 .bloom-subtle-card,
 .bloom-glass,
@@ -150,13 +225,13 @@ body > :not(.bloom-animated-bg) {
   border: 1px solid var(--glass-border) !important;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28), 0 0 24px -10px var(--accent-glow);
   color: var(--text-primary) !important;
-  transition: background 0.5s ease, border-color 0.4s ease, box-shadow 0.5s ease, transform 0.2s ease;
+  transition: background 0.4s ease, border-color 0.35s ease, box-shadow 0.4s ease, transform 0.2s ease;
 }
 
 nav,
 .fixed.bottom-0,
 .md\:hidden.fixed.bottom-14 {
-  background: rgba(19, 27, 46, 0.78) !important;
+  background: rgba(17, 22, 38, 0.76) !important;
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   border-color: var(--glass-border) !important;
@@ -165,7 +240,7 @@ nav,
 
 body [class*="bg-slate-950"],
 body [class*="bg-slate-900"] {
-  background-color: rgba(24, 34, 56, 0.68) !important;
+  background-color: rgba(20, 28, 46, 0.66) !important;
   color: var(--text-primary) !important;
   border-color: var(--glass-border) !important;
 }
@@ -173,7 +248,7 @@ body [class*="bg-slate-900"] {
 body input,
 body select,
 body textarea {
-  background-color: rgba(15, 23, 42, 0.75) !important;
+  background-color: rgba(15, 23, 42, 0.74) !important;
   color: var(--text-primary) !important;
   border-color: rgba(255, 255, 255, 0.14) !important;
 }
@@ -211,7 +286,7 @@ button[class*="bg-rose-600"] [class*="text-white"] {
 
 .bloom-lift:hover {
   transform: translateY(-2px);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.34), 0 0 18px -6px var(--accent-glow);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.34), 0 0 22px -6px var(--accent-glow);
 }
 
 /* =========================================================
@@ -355,12 +430,17 @@ button[class*="bg-rose-600"] [class*="text-white"] {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(244, 63, 94, 0.45);
+  background: rgba(148, 163, 184, 0.48);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bloom-animated-bg {
-    animation: none;
+  html,
+  body,
+  body::before,
+  body::after,
+  .bloom-animated-bg,
+  .bloom-animated-bg::after {
+    animation: none !important;
   }
 
   .bloom-lift:hover {

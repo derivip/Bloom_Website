@@ -343,7 +343,7 @@ function switchTab(tabId) {
 }
 
 // --- GUIDANCE LIBRARY WITH TOPIC DETAIL, VIDEO, M4A PODCAST, TRANSCRIPT & BLOOM AI ---
-const GUIDE_STORAGE_BUCKET = 'guidance-media';
+const GUIDE_STORAGE_BUCKET = 'guidance_media';
 let activeGuideTopic = null;
 
 function getSupabasePublicFileUrl(filePath) {

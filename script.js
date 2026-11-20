@@ -171,8 +171,7 @@ async function fetchAiMicroSteps(taskTitle, elementId) {
                         <span>Regenerate with AI</span>
                     </button>
                 </div>
-                <div class="text-slate-200 whitespace-pre-line leading-relaxed pl-1">${stepsText.trim()}</div>
-            </div>
+                <div class="text-slate-200 <div class="bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 text-sm leading-relaxed whitespace-pre-line">
         `;
     } catch (err) {
         console.error("Micro-steps error:", err);
@@ -559,23 +558,50 @@ function stopVoiceUI() {
     if (input) input.placeholder = "Ask Bloom anything...";
 }
 
-// --- DIAGRAM & MESSAGE FORMATTER ---
 function formatAiMessageContent(rawText) {
-    const mermaidRegex = /```mermaid\s*([\s\S]*?)```/g;
-    return rawText.replace(mermaidRegex, (match, code) => {
-        const cleanCode = code.trim();
-        return `
+    const mermaidBlocks = [];
+    let processedText = String(rawText || '').replace(/```mermaid\s*([\s\S]*?)```/g, (match, code) => {
+        const placeholder = `%%MERMAID_BLOCK_${mermaidBlocks.length}%%`;
+        mermaidBlocks.push(`
             <div class="my-3 p-4 rounded-2xl bg-slate-950 border border-rose-500/30 overflow-x-auto shadow-inner">
                 <div class="text-[10px] font-bold uppercase tracking-wider text-rose-400 mb-2 flex items-center gap-1.5">
                     <i data-lucide="git-branch" class="w-3.5 h-3.5"></i>
                     <span>Bloom Visual Roadmap</span>
                 </div>
-                <div class="mermaid flex justify-center">${cleanCode}</div>
+                <div class="mermaid flex justify-center">${code.trim()}</div>
             </div>
-        `;
+        `);
+        return placeholder;
     });
-}
 
+    let html = '';
+    try {
+        html = window.marked
+            ? marked.parse(processedText, { breaks: true, gfm: true })
+            : processedText.replace(/\n/g, '<br>');
+    } catch {
+        html = processedText.replace(/\n/g, '<br>');
+    }
+
+    html = html
+        .replace(/<table>/g, '<div class="my-3 overflow-x-auto rounded-xl border border-white/10"><table class="w-full text-left text-xs border-collapse">')
+        .replace(/<\/table>/g, '</table></div>')
+        .replace(/<thead>/g, '<thead class="bg-slate-900/90 text-rose-300 uppercase text-[11px]">')
+        .replace(/<th>/g, '<th class="p-2.5 border-b border-white/10 font-semibold whitespace-nowrap">')
+        .replace(/<td>/g, '<td class="p-2.5 border-b border-white/5 text-slate-200 align-top">')
+        .replace(/<h1>/g, '<h1 class="text-lg font-bold text-white mt-3 mb-1.5">')
+        .replace(/<h2>/g, '<h2 class="text-base font-bold text-rose-300 mt-3 mb-1.5">')
+        .replace(/<h3>/g, '<h3 class="text-sm font-bold text-white mt-2.5 mb-1">')
+        .replace(/<ul>/g, '<ul class="list-disc pl-5 my-2 space-y-1">')
+        .replace(/<ol>/g, '<ol class="list-decimal pl-5 my-2 space-y-1">')
+        .replace(/<p>/g, '<p class="mb-2 last:mb-0">');
+
+    mermaidBlocks.forEach((block, i) => {
+        html = html.replace(`%%MERMAID_BLOCK_${i}%%`, block);
+    });
+
+    return html;
+}
 async function renderDiagramsInChat() {
     if (window.mermaid) {
         try {
@@ -726,8 +752,7 @@ async function selectChatSession(sessionId) {
                         <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
                             <i data-lucide="flower-2" class="w-4 h-4"></i>
                         </div>
-                        <div class="bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 text-sm leading-relaxed whitespace-pre-line">
-                            ${formatAiMessageContent(m.content)}
+<div class="bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 text-sm leading-relaxed whitespace-pre-line">                            ${formatAiMessageContent(m.content)}
                         </div>
                     </div>
                 `;

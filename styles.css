@@ -1,22 +1,80 @@
 /* =========================================================
-   BLOOM — DYNAMIC AMBIENT THEME & FULL-SCREEN CHAT STYLES
+   BLOOM — FULL DYNAMIC THEME & CHATBOT STYLESHEET
    ========================================================= */
 
 :root {
-  --bg-base: #0d111d;
-  --accent-rose: rgba(244, 63, 94, 0.24);
-  --accent-sky: rgba(56, 189, 248, 0.2);
-  --accent-violet: rgba(168, 85, 247, 0.18);
-  --surface-glass: rgba(19, 27, 46, 0.72);
-  --surface-elevated: rgba(30, 41, 68, 0.78);
-  --surface-border: rgba(255, 255, 255, 0.12);
+  /* Default Palette: Sunset Rose & Sky */
+  --bg-deep: #090d16;
+  --orb-1: rgba(244, 63, 94, 0.28);
+  --orb-2: rgba(56, 189, 248, 0.24);
+  --orb-3: rgba(168, 85, 247, 0.22);
+  --orb-4: rgba(251, 146, 60, 0.16);
+  --accent-glow: rgba(244, 63, 94, 0.35);
+
+  --glass-bg: rgba(15, 23, 42, 0.64);
+  --glass-elevated: rgba(24, 35, 60, 0.78);
+  --glass-border: rgba(255, 255, 255, 0.13);
+
   --text-primary: #f8fafc;
   --text-secondary: #cbd5e1;
   --text-muted: #94a3b8;
-  --brand-primary: #f43f5e;
-  --brand-secondary: #38bdf8;
+  --accent-heading: #fda4af;
+  --accent-table-head: rgba(244, 63, 94, 0.18);
+  --accent-table-text: #fecdd3;
+  --accent-code: #7dd3fc;
 }
 
+/* Preset 2: Cyber Mint & Electric Blue */
+[data-bloom-theme="cyber-mint"] {
+  --bg-deep: #071217;
+  --orb-1: rgba(16, 185, 129, 0.28);
+  --orb-2: rgba(14, 165, 233, 0.26);
+  --orb-3: rgba(45, 212, 191, 0.20);
+  --orb-4: rgba(59, 130, 246, 0.18);
+  --accent-glow: rgba(16, 185, 129, 0.38);
+  --glass-bg: rgba(9, 24, 32, 0.66);
+  --glass-elevated: rgba(15, 37, 49, 0.80);
+  --accent-heading: #6ee7b7;
+  --accent-table-head: rgba(16, 185, 129, 0.18);
+  --accent-table-text: #a7f3d0;
+  --accent-code: #67e8f9;
+}
+
+/* Preset 3: Warm Gold & Coral */
+[data-bloom-theme="gold-coral"] {
+  --bg-deep: #140c0a;
+  --orb-1: rgba(251, 113, 133, 0.26);
+  --orb-2: rgba(250, 204, 21, 0.22);
+  --orb-3: rgba(249, 115, 22, 0.24);
+  --orb-4: rgba(244, 63, 94, 0.16);
+  --accent-glow: rgba(250, 204, 21, 0.34);
+  --glass-bg: rgba(26, 16, 15, 0.66);
+  --glass-elevated: rgba(39, 24, 22, 0.80);
+  --accent-heading: #fde047;
+  --accent-table-head: rgba(250, 204, 21, 0.16);
+  --accent-table-text: #fef08a;
+  --accent-code: #fdba74;
+}
+
+/* Preset 4: Deep Indigo & Neon Pink */
+[data-bloom-theme="indigo-neon"] {
+  --bg-deep: #090716;
+  --orb-1: rgba(236, 72, 153, 0.28);
+  --orb-2: rgba(99, 102, 241, 0.28);
+  --orb-3: rgba(192, 132, 252, 0.22);
+  --orb-4: rgba(129, 140, 248, 0.18);
+  --accent-glow: rgba(236, 72, 153, 0.38);
+  --glass-bg: rgba(16, 13, 34, 0.68);
+  --glass-elevated: rgba(26, 21, 54, 0.82);
+  --accent-heading: #f9a8d4;
+  --accent-table-head: rgba(236, 72, 153, 0.18);
+  --accent-table-text: #fbcfe8;
+  --accent-code: #c4b5fd;
+}
+
+/* =========================================================
+   BASE RESET & DYNAMIC ANIMATED BACKDROP
+   ========================================================= */
 *,
 *::before,
 *::after {
@@ -28,92 +86,129 @@ body {
   height: 100%;
   margin: 0;
   padding: 0;
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   color: var(--text-primary);
-  background-color: var(--bg-base);
-  overflow-x: clip;
+  background-color: var(--bg-deep);
+  overflow-x: hidden;
+  transition: background-color 0.6s ease, color 0.3s ease;
   -webkit-font-smoothing: antialiased;
 }
 
-/* =========================================================
-   1. ANIMATED DYNAMIC GRADIENT BACKGROUND
-   ========================================================= */
 body {
   position: relative;
   min-height: 100dvh;
 }
 
+/* Drifting multi-color gradient orbs */
 body::before {
   content: "";
   position: fixed;
-  inset: -20%;
-  z-index: -1;
+  inset: -28%;
+  z-index: -2;
   pointer-events: none;
   background:
-    radial-gradient(circle at 18% 22%, var(--accent-rose), transparent 45%),
-    radial-gradient(circle at 82% 28%, var(--accent-sky), transparent 50%),
-    radial-gradient(circle at 50% 85%, var(--accent-violet), transparent 55%);
-  filter: blur(52px);
-  animation: bloomAmbientShift 18s ease-in-out infinite alternate;
+    radial-gradient(circle at 18% 22%, var(--orb-1), transparent 44%),
+    radial-gradient(circle at 82% 26%, var(--orb-2), transparent 48%),
+    radial-gradient(circle at 30% 82%, var(--orb-3), transparent 52%),
+    radial-gradient(circle at 78% 76%, var(--orb-4), transparent 48%);
+  filter: blur(56px);
+  animation: bloomMeshFloat 18s ease-in-out infinite alternate;
+  transition: background 0.7s ease;
   will-change: transform;
 }
 
-@keyframes bloomAmbientShift {
+/* Slow rotating aurora ribbon for added motion depth */
+body::after {
+  content: "";
+  position: fixed;
+  inset: -35%;
+  z-index: -1;
+  pointer-events: none;
+  background: conic-gradient(
+    from 90deg at 50% 50%,
+    transparent 0deg,
+    var(--orb-2) 75deg,
+    transparent 150deg,
+    var(--orb-1) 240deg,
+    transparent 360deg
+  );
+  filter: blur(72px);
+  opacity: 0.55;
+  animation: bloomAuroraSpin 32s linear infinite;
+  will-change: transform;
+}
+
+@keyframes bloomMeshFloat {
   0% {
-    transform: translate3d(-2%, -2%, 0) scale(1);
+    transform: translate3d(-3%, -2%, 0) scale(1);
   }
   50% {
-    transform: translate3d(2.5%, 1.5%, 0) scale(1.06);
+    transform: translate3d(3%, 2.5%, 0) scale(1.08);
   }
   100% {
-    transform: translate3d(-1.5%, 2.5%, 0) scale(1.03);
+    transform: translate3d(-2%, 3%, 0) scale(1.04);
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  body::before {
-    animation: none;
+@keyframes bloomAuroraSpin {
+  0% {
+    transform: rotate(0deg) scale(1.05);
+  }
+  100% {
+    transform: rotate(360deg) scale(1.05);
   }
 }
 
 /* =========================================================
-   2. GLASS PANELS & CARDS ACROSS THE SITE
+   GLASS PANELS & INTERACTIVE LIFT HELPERS
    ========================================================= */
+.bloom-glass,
 .glass-panel,
 .card {
-  background: var(--surface-glass);
-  border: 1px solid var(--surface-border);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
   border-radius: 1rem;
-  box-shadow: 0 12px 32px rgba(2, 6, 23, 0.45);
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.35), 0 0 24px -10px var(--accent-glow);
+  transition: background 0.5s ease, border-color 0.4s ease, box-shadow 0.5s ease, transform 0.2s ease;
+}
+
+.bloom-lift {
+  transition: transform 0.2s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.bloom-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4), 0 0 18px -6px var(--accent-glow);
 }
 
 /* =========================================================
-   3. FULL-SCREEN AI CHATBOT SHELL (100dvh GRID)
+   FULL-SCREEN AI CHATBOT SHELL (100dvh GRID)
    ========================================================= */
 .bloom-chat-shell {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   width: 100%;
-  max-width: none !important;
+  max-width: none;
   height: 100dvh;
   min-height: 100dvh;
   margin: 0;
-  background: var(--surface-glass);
+  background: var(--glass-bg);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
-  border-left: 1px solid var(--surface-border);
-  border-right: 1px solid var(--surface-border);
+  border-left: 1px solid var(--glass-border);
+  border-right: 1px solid var(--glass-border);
 }
 
 .bloom-chat-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.75rem;
   padding: 0.9rem 1.25rem;
-  border-bottom: 1px solid var(--surface-border);
-  background: rgba(13, 17, 29, 0.65);
+  border-bottom: 1px solid var(--glass-border);
+  background: rgba(9, 13, 22, 0.65);
 }
 
 .bloom-chat-messages {
@@ -128,17 +223,17 @@ body::before {
 
 .bloom-chat-input-bar {
   padding: 0.9rem 1.25rem;
-  border-top: 1px solid var(--surface-border);
-  background: rgba(13, 17, 29, 0.78);
+  border-top: 1px solid var(--glass-border);
+  background: rgba(9, 13, 22, 0.78);
 }
 
 /* =========================================================
-   4. WIDE, CLEAN AI BUBBLES, TABLES & GENERATED IMAGES
+   AI BUBBLES, MARKDOWN TABLES, CODE & GENERATED IMAGES
    ========================================================= */
 .bloom-chat-bubble-ai {
   max-width: min(88ch, 92%);
-  background: var(--surface-elevated);
-  border: 1px solid var(--surface-border);
+  background: var(--glass-elevated);
+  border: 1px solid var(--glass-border);
   border-radius: 1.15rem;
   border-top-left-radius: 0.25rem;
   padding: 1rem 1.15rem;
@@ -147,6 +242,7 @@ body::before {
   line-height: 1.6;
   white-space: normal;
   word-wrap: break-word;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
 }
 
 .bloom-chat-bubble-ai h1,
@@ -159,14 +255,21 @@ body::before {
   line-height: 1.3;
 }
 
+.bloom-chat-bubble-ai h1:first-child,
+.bloom-chat-bubble-ai h2:first-child,
+.bloom-chat-bubble-ai h3:first-child {
+  margin-top: 0;
+}
+
 .bloom-chat-bubble-ai h2 {
-  color: #fda4af;
+  color: var(--accent-heading);
   font-size: 1.05rem;
 }
 
 .bloom-chat-bubble-ai p {
   margin-top: 0;
   margin-bottom: 0.65rem;
+  color: var(--text-secondary);
 }
 
 .bloom-chat-bubble-ai p:last-child {
@@ -177,20 +280,21 @@ body::before {
 .bloom-chat-bubble-ai ol {
   margin: 0.5rem 0 0.75rem 1.25rem;
   padding: 0;
+  color: var(--text-secondary);
 }
 
 .bloom-chat-bubble-ai li {
   margin-bottom: 0.3rem;
 }
 
-/* Markdown Tables inside Chat */
+/* Markdown Tables */
 .bloom-chat-bubble-ai table {
   width: 100%;
   border-collapse: collapse;
   margin: 0.75rem 0;
   font-size: 0.825rem;
-  background: rgba(13, 17, 29, 0.7);
-  border: 1px solid var(--surface-border);
+  background: rgba(9, 13, 22, 0.75);
+  border: 1px solid var(--glass-border);
   border-radius: 0.65rem;
   overflow: hidden;
   display: block;
@@ -198,8 +302,8 @@ body::before {
 }
 
 .bloom-chat-bubble-ai thead {
-  background: rgba(244, 63, 94, 0.16);
-  color: #fecdd3;
+  background: var(--accent-table-head);
+  color: var(--accent-table-text);
   text-transform: uppercase;
   font-size: 0.72rem;
   letter-spacing: 0.03em;
@@ -213,36 +317,41 @@ body::before {
   vertical-align: top;
 }
 
-/* Generated Images inside Chat */
+/* Generated & Attached Images */
 .bloom-chat-bubble-ai img {
   max-width: 100%;
   height: auto;
   border-radius: 0.75rem;
   margin-top: 0.65rem;
-  border: 1px solid var(--surface-border);
+  border: 1px solid var(--glass-border);
   display: block;
 }
 
 /* Inline Code & Code Blocks */
 .bloom-chat-bubble-ai code {
-  background: rgba(13, 17, 29, 0.85);
+  background: rgba(9, 13, 22, 0.85);
   padding: 0.15rem 0.4rem;
   border-radius: 0.35rem;
   font-size: 0.85em;
-  color: #7dd3fc;
+  color: var(--accent-code);
 }
 
 .bloom-chat-bubble-ai pre {
-  background: rgba(13, 17, 29, 0.92);
-  border: 1px solid var(--surface-border);
+  background: rgba(9, 13, 22, 0.92);
+  border: 1px solid var(--glass-border);
   border-radius: 0.65rem;
   padding: 0.85rem;
   overflow-x: auto;
   margin: 0.65rem 0;
 }
 
+.bloom-chat-bubble-ai pre code {
+  background: transparent;
+  padding: 0;
+}
+
 /* =========================================================
-   5. SUBTLE CUSTOM SCROLLBAR
+   SCROLLBAR & REDUCED MOTION
    ========================================================= */
 ::-webkit-scrollbar {
   width: 7px;
@@ -260,4 +369,15 @@ body::before {
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(148, 163, 184, 0.48);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before,
+  body::after {
+    animation: none;
+  }
+
+  .bloom-lift:hover {
+    transform: none;
+  }
 }

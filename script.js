@@ -1333,3 +1333,109 @@ document.addEventListener('DOMContentLoaded', async () => {
     await syncAuthButton();
     if (window.lucide) lucide.createIcons();
 });
+
+const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com';
+const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+let googleAccessToken = null;
+
+function requestGoogleCalendarToken() {
+    return new Promise((resolve, reject) => {
+        if (!window.google?.accounts?.oauth2) {
+            reject(new Error('Google Identity Services script not loaded.'));
+            return;
+        }
+        const tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: GOOGLE_CLIENT_ID,
+            scope: CALENDAR_SCOPE,
+            callback: (resp) => {
+                if (resp.error) {
+                    reject(new Error(resp.error));
+                    return;
+                }
+                googleAccessToken = resp.access_token;
+                resolve(googleAccessToken);
+            }
+        });
+        tokenClient.requestAccessToken({ prompt: googleAccessToken ? '' : 'consent' });
+    });
+}
+
+async function syncTaskToGoogleCalendar(taskId) {
+    const task = tasks.find(t => String(t.id) === String(taskId));
+    if (!task) return;
+
+    try {
+        const token = googleAccessToken || await requestGoogleCalendarToken();
+        const start = new Date();
+        start.setMinutes(0, 0, 0);
+        start.setHours(start.getHours() + 1);
+        const end = new Date(start.getTime() + 45 * 60 * 1000);
+
+        const eventPayload = {
+            summary: `Bloom Focus: ${task.title}`,
+            description: `Category: ${task.category || 'General'} | Priority: ${(task.priority || 'medium').toUpperCase()}`,
+            start: { dateTime: start.toISOString() },
+            end: { dateTime: end.toISOString() }
+        };
+
+        const res = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(eventPayload)
+        });
+
+        if (res.status === 401) {
+            googleAccessToken = null;
+            return syncTaskToGoogleCalendar(taskId);
+        }
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error?.message || `Calendar API error (${res.status})`);
+        }
+
+        const created = await res.json();
+        alert(`Synced "${task.title}" to Google Calendar!`);
+        if (created.htmlLink) window.open(created.htmlLink, '_blank', 'noopener');
+    } catch (err) {
+        console.error('Google Calendar sync failed:', err);
+        alert(`Could not sync to Google Calendar: ${err.message}`);
+    }
+}
+
+function downloadTaskIcs(taskId) {
+    const task = tasks.find(t => String(t.id) === String(taskId));
+    if (!task) return;
+
+    const fmt = (d) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    const start = new Date(Date.now() + 60 * 60 * 1000);
+    const end = new Date(start.getTime() + 45 * 60 * 1000);
+    const cleanSummary = String(task.title).replace(/[,;\\]/g, ' ');
+
+    const ics = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//Bloom//Focus Tasks//EN',
+        'BEGIN:VEVENT',
+        `UID:bloom-task-${task.id}-${Date.now()}@bloom.app`,
+        `DTSTAMP:${fmt(new Date())}`,
+        `DTSTART:${fmt(start)}`,
+        `DTEND:${fmt(end)}`,
+        `SUMMARY:Bloom Focus: ${cleanSummary}`,
+        `DESCRIPTION:Priority ${task.priority || 'medium'} (${task.category || 'Focus'})`,
+        'END:VEVENT',
+        'END:VCALENDAR'
+    ].join('\r\n');
+
+    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${cleanSummary.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'bloom-task'}.ics`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+}

@@ -436,7 +436,14 @@ body > :not(.bloom-animated-bg) {
   -webkit-backdrop-filter: blur(14px);
   border-color: rgba(255, 255, 255, 0.12) !important;
 }
-
+/* Automatically style the 3 feature cards without editing HTML */
+main section:last-of-type > div > div,
+main section:last-of-type .grid > div {
+  background: rgba(18, 25, 46, 0.62) !important;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-color: rgba(255, 255, 255, 0.14) !important;
+}
 @media (prefers-reduced-motion: reduce) {
   .bloom-animated-bg {
     animation: none;

@@ -1,79 +1,83 @@
 /* =========================================================
-   BLOOM — FULL DYNAMIC THEME & CHATBOT STYLESHEET
+   BLOOM — BRIGHT NON-DARK DYNAMIC THEME & CHATBOT STYLESHEET
    ========================================================= */
 
 :root {
-  /* Default Palette: Sunset Rose & Sky */
-  --bg-deep: #090d16;
-  --orb-1: rgba(244, 63, 94, 0.28);
+  /* Default Palette: Soft Daylight Rose, Sky & Lavender */
+  --bg-light: #f6f8fc;
+  --bg-wash: linear-gradient(135deg, #fff5f7 0%, #f0f9ff 48%, #f5f3ff 100%);
+  --orb-1: rgba(251, 113, 133, 0.24);
   --orb-2: rgba(56, 189, 248, 0.24);
-  --orb-3: rgba(168, 85, 247, 0.22);
-  --orb-4: rgba(251, 146, 60, 0.16);
-  --accent-glow: rgba(244, 63, 94, 0.35);
+  --orb-3: rgba(168, 85, 247, 0.18);
+  --orb-4: rgba(251, 191, 36, 0.18);
+  --accent-glow: rgba(244, 63, 94, 0.20);
 
-  --glass-bg: rgba(15, 23, 42, 0.64);
-  --glass-elevated: rgba(24, 35, 60, 0.78);
-  --glass-border: rgba(255, 255, 255, 0.13);
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-elevated: rgba(255, 255, 255, 0.88);
+  --glass-border: rgba(15, 23, 42, 0.10);
 
-  --text-primary: #f8fafc;
-  --text-secondary: #cbd5e1;
-  --text-muted: #94a3b8;
-  --accent-heading: #fda4af;
-  --accent-table-head: rgba(244, 63, 94, 0.18);
-  --accent-table-text: #fecdd3;
-  --accent-code: #7dd3fc;
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  --accent-heading: #be123c;
+  --accent-table-head: rgba(244, 63, 94, 0.12);
+  --accent-table-text: #9f1239;
+  --accent-code: #0369a1;
 }
 
-/* Preset 2: Cyber Mint & Electric Blue */
+/* Preset 2: Fresh Mint & Sky Breeze */
 [data-bloom-theme="cyber-mint"] {
-  --bg-deep: #071217;
-  --orb-1: rgba(16, 185, 129, 0.28);
-  --orb-2: rgba(14, 165, 233, 0.26);
+  --bg-light: #f2fbf8;
+  --bg-wash: linear-gradient(135deg, #ecfdf5 0%, #f0f9ff 52%, #f0fdfa 100%);
+  --orb-1: rgba(16, 185, 129, 0.22);
+  --orb-2: rgba(14, 165, 233, 0.22);
   --orb-3: rgba(45, 212, 191, 0.20);
-  --orb-4: rgba(59, 130, 246, 0.18);
-  --accent-glow: rgba(16, 185, 129, 0.38);
-  --glass-bg: rgba(9, 24, 32, 0.66);
-  --glass-elevated: rgba(15, 37, 49, 0.80);
-  --accent-heading: #6ee7b7;
-  --accent-table-head: rgba(16, 185, 129, 0.18);
-  --accent-table-text: #a7f3d0;
-  --accent-code: #67e8f9;
+  --orb-4: rgba(125, 211, 252, 0.22);
+  --accent-glow: rgba(16, 185, 129, 0.20);
+  --glass-bg: rgba(255, 255, 255, 0.74);
+  --glass-elevated: rgba(255, 255, 255, 0.90);
+  --accent-heading: #047857;
+  --accent-table-head: rgba(16, 185, 129, 0.12);
+  --accent-table-text: #065f46;
+  --accent-code: #0f766e;
 }
 
-/* Preset 3: Warm Gold & Coral */
+/* Preset 3: Sunny Gold & Peach */
 [data-bloom-theme="gold-coral"] {
-  --bg-deep: #140c0a;
-  --orb-1: rgba(251, 113, 133, 0.26);
-  --orb-2: rgba(250, 204, 21, 0.22);
-  --orb-3: rgba(249, 115, 22, 0.24);
-  --orb-4: rgba(244, 63, 94, 0.16);
-  --accent-glow: rgba(250, 204, 21, 0.34);
-  --glass-bg: rgba(26, 16, 15, 0.66);
-  --glass-elevated: rgba(39, 24, 22, 0.80);
-  --accent-heading: #fde047;
-  --accent-table-head: rgba(250, 204, 21, 0.16);
-  --accent-table-text: #fef08a;
-  --accent-code: #fdba74;
+  --bg-light: #fffaf3;
+  --bg-wash: linear-gradient(135deg, #fffbeb 0%, #fff7ed 50%, #fff1f2 100%);
+  --orb-1: rgba(251, 146, 60, 0.22);
+  --orb-2: rgba(250, 204, 21, 0.24);
+  --orb-3: rgba(251, 113, 133, 0.18);
+  --orb-4: rgba(253, 224, 71, 0.20);
+  --accent-glow: rgba(245, 158, 11, 0.20);
+  --glass-bg: rgba(255, 255, 255, 0.75);
+  --glass-elevated: rgba(255, 255, 255, 0.90);
+  --accent-heading: #b45309;
+  --accent-table-head: rgba(245, 158, 11, 0.13);
+  --accent-table-text: #92400e;
+  --accent-code: #c2410c;
 }
 
-/* Preset 4: Deep Indigo & Neon Pink */
+/* Preset 4: Soft Periwinkle & Blossom Pink */
 [data-bloom-theme="indigo-neon"] {
-  --bg-deep: #090716;
-  --orb-1: rgba(236, 72, 153, 0.28);
-  --orb-2: rgba(99, 102, 241, 0.28);
-  --orb-3: rgba(192, 132, 252, 0.22);
-  --orb-4: rgba(129, 140, 248, 0.18);
-  --accent-glow: rgba(236, 72, 153, 0.38);
-  --glass-bg: rgba(16, 13, 34, 0.68);
-  --glass-elevated: rgba(26, 21, 54, 0.82);
-  --accent-heading: #f9a8d4;
-  --accent-table-head: rgba(236, 72, 153, 0.18);
-  --accent-table-text: #fbcfe8;
-  --accent-code: #c4b5fd;
+  --bg-light: #f7f6ff;
+  --bg-wash: linear-gradient(135deg, #fdf2f8 0%, #eef2ff 52%, #faf5ff 100%);
+  --orb-1: rgba(236, 72, 153, 0.18);
+  --orb-2: rgba(129, 140, 248, 0.22);
+  --orb-3: rgba(192, 132, 252, 0.20);
+  --orb-4: rgba(147, 197, 253, 0.20);
+  --accent-glow: rgba(139, 92, 246, 0.20);
+  --glass-bg: rgba(255, 255, 255, 0.74);
+  --glass-elevated: rgba(255, 255, 255, 0.90);
+  --accent-heading: #6d28d9;
+  --accent-table-head: rgba(139, 92, 246, 0.12);
+  --accent-table-text: #5b21b6;
+  --accent-code: #4338ca;
 }
 
 /* =========================================================
-   BASE RESET & DYNAMIC ANIMATED BACKDROP
+   BASE RESET & FULL-SCREEN LIGHT ANIMATED BACKDROP
    ========================================================= */
 *,
 *::before,
@@ -83,172 +87,175 @@
 
 html,
 body {
-  height: 100%;
+  min-height: 100dvh;
   margin: 0;
   padding: 0;
   font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  color: var(--text-primary);
-  background-color: var(--bg-deep);
+  color: var(--text-primary) !important;
+  background-color: var(--bg-light) !important;
+  background-image: var(--bg-wash) !important;
   overflow-x: hidden;
-  transition: background-color 0.6s ease, color 0.3s ease;
+  transition: background-color 0.6s ease, background-image 0.6s ease, color 0.3s ease;
   -webkit-font-smoothing: antialiased;
 }
 
 body {
   position: relative;
-  min-height: 100dvh;
 }
 
-/* Drifting multi-color gradient orbs */
-body::before {
-  content: "";
+/* Full-viewport animated gradient orbs & light wash */
+.bloom-animated-bg {
   position: fixed;
-  inset: -28%;
-  z-index: -2;
+  inset: -20%;
+  width: 140vw;
+  height: 140vh;
+  z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(circle at 18% 22%, var(--orb-1), transparent 44%),
+    radial-gradient(circle at 18% 24%, var(--orb-1), transparent 46%),
     radial-gradient(circle at 82% 26%, var(--orb-2), transparent 48%),
-    radial-gradient(circle at 30% 82%, var(--orb-3), transparent 52%),
+    radial-gradient(circle at 30% 80%, var(--orb-3), transparent 52%),
     radial-gradient(circle at 78% 76%, var(--orb-4), transparent 48%);
-  filter: blur(56px);
-  animation: bloomMeshFloat 18s ease-in-out infinite alternate;
-  transition: background 0.7s ease;
+  filter: blur(54px);
+  animation: bloomLightDrift 22s ease-in-out infinite alternate;
   will-change: transform;
 }
 
-/* Slow rotating aurora ribbon for added motion depth */
-body::after {
-  content: "";
-  position: fixed;
-  inset: -35%;
-  z-index: -1;
-  pointer-events: none;
-  background: conic-gradient(
-    from 90deg at 50% 50%,
-    transparent 0deg,
-    var(--orb-2) 75deg,
-    transparent 150deg,
-    var(--orb-1) 240deg,
-    transparent 360deg
-  );
-  filter: blur(72px);
-  opacity: 0.55;
-  animation: bloomAuroraSpin 32s linear infinite;
-  will-change: transform;
-}
-
-@keyframes bloomMeshFloat {
+@keyframes bloomLightDrift {
   0% {
-    transform: translate3d(-3%, -2%, 0) scale(1);
+    transform: translate3d(-2.5%, -2%, 0) scale(1);
   }
   50% {
-    transform: translate3d(3%, 2.5%, 0) scale(1.08);
+    transform: translate3d(2.5%, 2%, 0) scale(1.06);
   }
   100% {
-    transform: translate3d(-2%, 3%, 0) scale(1.04);
+    transform: translate3d(-1.5%, 2.5%, 0) scale(1.03);
   }
 }
 
-@keyframes bloomAuroraSpin {
-  0% {
-    transform: rotate(0deg) scale(1.05);
-  }
-  100% {
-    transform: rotate(360deg) scale(1.05);
-  }
+/* Keep page content cleanly above animated backdrop */
+body > :not(.bloom-animated-bg) {
+  position: relative;
+  z-index: 1;
 }
 
 /* =========================================================
-   GLASS PANELS & INTERACTIVE LIFT HELPERS
+   LIGHT FROSTED GLASS CARDS & TAILWIND DARK-CLASS OVERRIDES
    ========================================================= */
+.bloom-subtle-card,
 .bloom-glass,
 .glass-panel,
 .card {
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border-radius: 1rem;
-  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.35), 0 0 24px -10px var(--accent-glow);
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border) !important;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06), 0 0 24px -10px var(--accent-glow);
+  color: var(--text-primary) !important;
   transition: background 0.5s ease, border-color 0.4s ease, box-shadow 0.5s ease, transform 0.2s ease;
 }
 
-.bloom-lift {
-  transition: transform 0.2s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+/* Soften heavy dark utility surfaces so the bright animated theme shines through */
+nav,
+.fixed.bottom-0,
+.md\:hidden.fixed.bottom-14 {
+  background: rgba(255, 255, 255, 0.78) !important;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-color: rgba(15, 23, 42, 0.10) !important;
+  color: var(--text-primary) !important;
+}
+
+body [class*="bg-slate-950"],
+body [class*="bg-slate-900"] {
+  background-color: rgba(255, 255, 255, 0.68) !important;
+  color: var(--text-primary) !important;
+  border-color: rgba(15, 23, 42, 0.10) !important;
+}
+
+body input,
+body select,
+body textarea {
+  background-color: rgba(255, 255, 255, 0.86) !important;
+  color: #0f172a !important;
+  border-color: rgba(15, 23, 42, 0.16) !important;
+}
+
+body input::placeholder,
+body textarea::placeholder {
+  color: #64748b !important;
+}
+
+body [class*="text-white"] {
+  color: #0f172a !important;
+}
+
+body [class*="text-slate-200"],
+body [class*="text-slate-300"] {
+  color: #334155 !important;
+}
+
+body [class*="text-slate-400"],
+body [class*="text-slate-500"] {
+  color: #64748b !important;
+}
+
+/* Preserve crisp white text on primary gradient & solid action buttons */
+button[class*="from-rose-500"],
+button[class*="bg-rose-500"],
+button[class*="bg-rose-600"] {
+  color: #ffffff !important;
+}
+
+button[class*="from-rose-500"] [class*="text-white"],
+button[class*="bg-rose-500"] [class*="text-white"],
+button[class*="bg-rose-600"] [class*="text-white"] {
+  color: #ffffff !important;
 }
 
 .bloom-lift:hover {
   transform: translateY(-2px);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4), 0 0 18px -6px var(--accent-glow);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.10), 0 0 18px -6px var(--accent-glow);
 }
 
 /* =========================================================
-   FULL-SCREEN AI CHATBOT SHELL (100dvh GRID)
+   CHAT SHELL, BUBBLES, MARKDOWN TABLES & CODE
    ========================================================= */
 .bloom-chat-shell {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   width: 100%;
-  max-width: none;
-  height: 100dvh;
   min-height: 100dvh;
-  margin: 0;
   background: var(--glass-bg);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border-left: 1px solid var(--glass-border);
-  border-right: 1px solid var(--glass-border);
-}
-
-.bloom-chat-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.9rem 1.25rem;
-  border-bottom: 1px solid var(--glass-border);
-  background: rgba(9, 13, 22, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .bloom-chat-messages {
   overflow-y: auto;
   min-height: 0;
-  padding: 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
   scroll-behavior: smooth;
 }
 
-.bloom-chat-input-bar {
-  padding: 0.9rem 1.25rem;
-  border-top: 1px solid var(--glass-border);
-  background: rgba(9, 13, 22, 0.78);
-}
-
-/* =========================================================
-   AI BUBBLES, MARKDOWN TABLES, CODE & GENERATED IMAGES
-   ========================================================= */
 .bloom-chat-bubble-ai {
   max-width: min(88ch, 92%);
-  background: var(--glass-elevated);
-  border: 1px solid var(--glass-border);
+  background: var(--glass-elevated) !important;
+  border: 1px solid var(--glass-border) !important;
   border-radius: 1.15rem;
   border-top-left-radius: 0.25rem;
   padding: 1rem 1.15rem;
-  color: var(--text-primary);
+  color: var(--text-primary) !important;
   font-size: 0.9375rem;
   line-height: 1.6;
   white-space: normal;
   word-wrap: break-word;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
 }
 
 .bloom-chat-bubble-ai h1,
 .bloom-chat-bubble-ai h2,
 .bloom-chat-bubble-ai h3 {
-  color: #ffffff;
+  color: var(--text-primary);
   font-weight: 700;
   margin-top: 0.85rem;
   margin-bottom: 0.4rem;
@@ -266,34 +273,19 @@ body::after {
   font-size: 1.05rem;
 }
 
-.bloom-chat-bubble-ai p {
-  margin-top: 0;
-  margin-bottom: 0.65rem;
-  color: var(--text-secondary);
-}
-
-.bloom-chat-bubble-ai p:last-child {
-  margin-bottom: 0;
-}
-
+.bloom-chat-bubble-ai p,
 .bloom-chat-bubble-ai ul,
-.bloom-chat-bubble-ai ol {
-  margin: 0.5rem 0 0.75rem 1.25rem;
-  padding: 0;
+.bloom-chat-bubble-ai ol,
+.bloom-chat-bubble-ai li {
   color: var(--text-secondary);
 }
 
-.bloom-chat-bubble-ai li {
-  margin-bottom: 0.3rem;
-}
-
-/* Markdown Tables */
 .bloom-chat-bubble-ai table {
   width: 100%;
   border-collapse: collapse;
   margin: 0.75rem 0;
   font-size: 0.825rem;
-  background: rgba(9, 13, 22, 0.75);
+  background: rgba(255, 255, 255, 0.9);
   border: 1px solid var(--glass-border);
   border-radius: 0.65rem;
   overflow: hidden;
@@ -313,11 +305,11 @@ body::after {
 .bloom-chat-bubble-ai td {
   padding: 0.6rem 0.75rem;
   text-align: left;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  color: var(--text-primary);
   vertical-align: top;
 }
 
-/* Generated & Attached Images */
 .bloom-chat-bubble-ai img {
   max-width: 100%;
   height: auto;
@@ -327,9 +319,8 @@ body::after {
   display: block;
 }
 
-/* Inline Code & Code Blocks */
 .bloom-chat-bubble-ai code {
-  background: rgba(9, 13, 22, 0.85);
+  background: rgba(15, 23, 42, 0.06);
   padding: 0.15rem 0.4rem;
   border-radius: 0.35rem;
   font-size: 0.85em;
@@ -337,7 +328,7 @@ body::after {
 }
 
 .bloom-chat-bubble-ai pre {
-  background: rgba(9, 13, 22, 0.92);
+  background: rgba(241, 245, 249, 0.95);
   border: 1px solid var(--glass-border);
   border-radius: 0.65rem;
   padding: 0.85rem;
@@ -363,89 +354,20 @@ body::after {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.28);
+  background: rgba(15, 23, 42, 0.18);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.48);
+  background: rgba(244, 63, 94, 0.45);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  body::before,
-  body::after {
+  .bloom-animated-bg {
     animation: none;
   }
 
   .bloom-lift:hover {
     transform: none;
-  }
-}
-/* =========================================================
-   FULL-SCREEN SUBTLE ANIMATED GRADIENT (BLOOM)
-   ========================================================= */
-html,
-body {
-  min-height: 100dvh;
-  background-color: #0b1020 !important;
-}
-
-/* Full-screen animated gradient layer across the whole viewport */
-.bloom-animated-bg {
-  position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  z-index: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at 15% 20%, rgba(244, 63, 94, 0.16), transparent 45%),
-    radial-gradient(circle at 85% 25%, rgba(56, 189, 248, 0.16), transparent 48%),
-    radial-gradient(circle at 50% 80%, rgba(168, 85, 247, 0.14), transparent 52%),
-    linear-gradient(125deg, rgba(15, 23, 42, 0.85), rgba(24, 18, 43, 0.85), rgba(11, 27, 46, 0.85));
-  background-size: 160% 160%;
-  animation: bloomFullScreenFlow 20s ease-in-out infinite alternate;
-  will-change: background-position, transform;
-}
-
-@keyframes bloomFullScreenFlow {
-  0% {
-    background-position: 0% 20%;
-    transform: scale(1);
-  }
-  50% {
-    background-position: 100% 60%;
-    transform: scale(1.03);
-  }
-  100% {
-    background-position: 35% 100%;
-    transform: scale(1.01);
-  }
-}
-
-/* Keep your page content & cards cleanly above the background */
-body > :not(.bloom-animated-bg) {
-  position: relative;
-  z-index: 1;
-}
-
-/* Make cards & panels slightly translucent so the subtle animation shows through */
-.bloom-subtle-card {
-  background: rgba(18, 25, 46, 0.62) !important;
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border-color: rgba(255, 255, 255, 0.12) !important;
-}
-/* Automatically style the 3 feature cards without editing HTML */
-main section:last-of-type > div > div,
-main section:last-of-type .grid > div {
-  background: rgba(18, 25, 46, 0.62) !important;
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border-color: rgba(255, 255, 255, 0.14) !important;
-}
-@media (prefers-reduced-motion: reduce) {
-  .bloom-animated-bg {
-    animation: none;
   }
 }

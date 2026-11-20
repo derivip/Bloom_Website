@@ -1,599 +1,1198 @@
-/* =========================================================
-   BLOOM — MAIN APPLICATION SCRIPT (script.js)
-   Focus Tasks + Google Calendar Sync + Guidance Library + Bloom AI
-   ========================================================= */
+// BLOOM APPLICATION SCRIPT (2026 EDITION - SUPABASE, GEMINI AI, GUIDANCE DETAIL, MULTIMODAL, MULTI-CHAT, FOCUS RADIO & GOOGLE CALENDAR SYNC)
 
-// 1. Google Calendar OAuth Configuration (Replace with your Web Client ID)
+// SUPABASE CONFIGURATION
+const SUPABASE_URL = 'https://xmqmrkqyjnbupyalhnib.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_7AqK322TINFq1y39lMgvTw_Z7Itc79G';
+
+// GOOGLE CALENDAR OAUTH 2.0 CONFIGURATION (Replace with your Web Client ID from Google Cloud Console)
 const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com';
-const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+const GOOGLE_CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
 let googleAccessToken = null;
 
-// 2. App State
-const STORAGE_KEYS = {
-  tasks: 'bloom_focus_tasks_v1',
-  guidanceIndex: 'bloom_guidance_index_v1'
-};
+// Initialize Supabase Client
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-let tasks = loadTasks();
-let currentTaskFilter = 'all';
-let currentGuidanceIndex = loadGuidanceIndex();
-
-// Sample Guidance Library Topics (Swap or extend with your Supabase / local media URLs)
-const GUIDANCE_TOPICS = [
-  {
-    id: 'balance-routines',
-    title: 'Balancing School, Work & Energy Without Burning Out',
-    videoUrl: '',
-    audioUrl: '',
-    transcript:
-      'When your schedule gets tight, energy matters more than squeezing in extra hours. Pick one priority focus block each day, protect your sleep window, and keep quick fallback steps ready on busy shift days.'
-  },
-  {
-    id: 'deep-focus-blocks',
-    title: 'How to Run Short Focus Sprints That Actually Stick',
-    videoUrl: '',
-    audioUrl: '',
-    transcript:
-      'Start with a clear task title and a realistic 25-to-45 minute timer. Put your phone out of reach, write down the very next physical action, and sync important study or project blocks onto your calendar.'
-  },
-  {
-    id: 'steady-momentum',
-    title: 'Building Momentum When Motivation Drops',
-    videoUrl: '',
-    audioUrl: '',
-    transcript:
-      'Momentum comes from low-friction starts, not waiting to feel hyped. Even ten minutes of clean progress moves a task forward and keeps you from letting small tasks pile up.'
-  }
-];
-
-function loadTasks() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.tasks);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+// Initialize Mermaid for visual roadmaps & diagrams
+if (window.mermaid) {
+    mermaid.initialize({ startOnLoad: false, theme: 'dark' });
 }
 
-function saveTasks() {
-  try {
-    localStorage.setItem(STORAGE_KEYS.tasks, JSON.stringify(tasks));
-  } catch (err) {
-    console.warn('Could not save tasks to localStorage:', err);
-  }
+function escapeHtml(str) {
+    return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
-function loadGuidanceIndex() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.guidanceIndex);
-    const idx = Number(raw);
-    return Number.isInteger(idx) && idx >= 0 && idx < GUIDANCE_TOPICS.length ? idx : 0;
-  } catch {
-    return 0;
-  }
+function escapeJsSingleQuote(str) {
+    return String(str ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
 
-function saveGuidanceIndex(idx) {
-  try {
-    localStorage.setItem(STORAGE_KEYS.guidanceIndex, String(idx));
-  } catch {
-    // Ignore storage quota errors
-  }
-}
+function updateCalendarSyncStatus(label, tone = 'idle') {
+    const statusEl = document.getElementById('gcal-sync-status');
+    if (!statusEl) return;
 
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+    statusEl.textContent = label;
+    statusEl.className = 'text-xs px-2.5 py-1 rounded-full border transition-colors ';
 
-function updateGoogleStatus(text, tone = 'neutral') {
-  const badge = document.getElementById('gcal-status-badge');
-  if (!badge) return;
-
-  badge.textContent = text;
-  badge.className = 'text-xs px-2.5 py-1 rounded-full border transition ';
-
-  if (tone === 'connected') {
-    badge.className += 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200';
-  } else if (tone === 'error') {
-    badge.className += 'border-rose-400/40 bg-rose-500/15 text-rose-200';
-  } else {
-    badge.className += 'border-white/15 bg-slate-900/70 text-slate-300';
-  }
-}
-
-/* =========================================================
-   NAVIGATION / VIEW SWITCHER
-   ========================================================= */
-function setActiveSection(viewName) {
-  const sections = {
-    tasks: document.getElementById('section-tasks'),
-    guidance: document.getElementById('section-guidance'),
-    ai: document.getElementById('section-ai')
-  };
-
-  Object.entries(sections).forEach(([key, el]) => {
-    if (!el) return;
-    if (viewName === 'all' || viewName === key) {
-      el.classList.remove('hidden');
+    if (tone === 'connected') {
+        statusEl.className += 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300';
+    } else if (tone === 'error') {
+        statusEl.className += 'bg-rose-500/15 border-rose-500/40 text-rose-300';
     } else {
-      el.classList.add('hidden');
+        statusEl.className += 'bg-slate-900/80 border-white/10 text-slate-400';
     }
-  });
-
-  const navMap = {
-    all: document.getElementById('nav-all'),
-    tasks: document.getElementById('nav-tasks'),
-    guidance: document.getElementById('nav-guidance'),
-    ai: document.getElementById('nav-ai')
-  };
-
-  Object.entries(navMap).forEach(([key, btn]) => {
-    if (!btn) return;
-    const active = key === viewName;
-    btn.className = active
-      ? 'px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold border border-rose-400/40 bg-rose-500/20 text-white transition cursor-pointer'
-      : 'px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium border border-white/15 bg-white/5 hover:bg-white/15 text-slate-200 transition cursor-pointer';
-  });
 }
 
-/* =========================================================
-   FOCUS TASKS CRUD & RENDERING
-   ========================================================= */
-function handleTaskSubmit(event) {
-  event.preventDefault();
+// --- TASK MANAGEMENT WITH SUPABASE (PER-USER ISOLATED) ---
+let tasks = [];
+let currentFilter = 'all';
 
-  const titleEl = document.getElementById('task-title');
-  const categoryEl = document.getElementById('task-category');
-  const priorityEl = document.getElementById('task-priority');
-  const durationEl = document.getElementById('task-duration');
-  const timeEl = document.getElementById('task-scheduled-time');
-  const autoSyncEl = document.getElementById('task-auto-gcal');
+async function fetchTasks() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const container = document.getElementById('tasks-container');
 
-  const title = titleEl ? titleEl.value.trim() : '';
-  if (!title) return;
-
-  const newTask = {
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    title,
-    category: categoryEl ? categoryEl.value : 'Focus',
-    priority: priorityEl ? priorityEl.value : 'medium',
-    duration: durationEl ? Math.max(5, Number(durationEl.value) || 45) : 45,
-    scheduledTime: timeEl && timeEl.value ? timeEl.value : '',
-    completed: false,
-    syncedToCalendar: false
-  };
-
-  tasks.unshift(newTask);
-  saveTasks();
-  renderTasks();
-
-  if (titleEl) {
-    titleEl.value = '';
-    titleEl.focus();
-  }
-
-  if (autoSyncEl && autoSyncEl.checked) {
-    syncTaskToGoogleCalendar(newTask.id);
-  }
-}
-
-function toggleTaskComplete(taskId) {
-  tasks = tasks.map(t => (t.id === taskId ? { ...t, completed: !t.completed } : t));
-  saveTasks();
-  renderTasks();
-}
-
-function deleteTask(taskId) {
-  tasks = tasks.filter(t => t.id !== taskId);
-  saveTasks();
-  renderTasks();
-}
-
-function setTaskFilter(filter) {
-  currentTaskFilter = filter;
-  renderTasks();
-}
-
-function clearCompletedTasks() {
-  tasks = tasks.filter(t => !t.completed);
-  saveTasks();
-  renderTasks();
-}
-
-function getPriorityBadgeClasses(priority) {
-  switch ((priority || '').toLowerCase()) {
-    case 'high':
-      return 'bg-rose-500/20 text-rose-200 border-rose-400/30';
-    case 'low':
-      return 'bg-emerald-500/20 text-emerald-200 border-emerald-400/30';
-    default:
-      return 'bg-amber-500/20 text-amber-200 border-amber-400/30';
-  }
-}
-
-function renderTasks() {
-  const listEl = document.getElementById('tasks-list');
-  const countEl = document.getElementById('task-count-pill');
-  if (!listEl) return;
-
-  if (countEl) {
-    countEl.textContent = `${tasks.length} ${tasks.length === 1 ? 'task' : 'tasks'}`;
-  }
-
-  const filtered = tasks.filter(t => {
-    if (currentTaskFilter === 'active') return !t.completed;
-    if (currentTaskFilter === 'completed') return t.completed;
-    return true;
-  });
-
-  if (filtered.length === 0) {
-    listEl.innerHTML = `
-      <div class="p-4 rounded-xl border border-dashed border-white/15 text-center text-sm text-slate-400">
-        No tasks match this filter yet. Add a task above to use <strong>Sync to Google Calendar</strong>.
-      </div>
-    `;
-    return;
-  }
-
-  listEl.innerHTML = filtered
-    .map(task => {
-      const safeId = escapeHtml(task.id);
-      const safeTitle = escapeHtml(task.title);
-      const safeCategory = escapeHtml(task.category || 'Focus');
-      const safePriority = escapeHtml((task.priority || 'medium').toUpperCase());
-      const durationMins = Number(task.duration) || 45;
-      const timeLabel = task.scheduledTime
-        ? new Date(task.scheduledTime).toLocaleString([], {
-            month: 'short',
-            day: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit'
-          })
-        : 'Next open hour';
-
-      return `
-        <article class="p-4 rounded-xl bg-slate-950/55 border border-white/10 space-y-3 transition hover:border-white/20">
-          <div class="flex items-start justify-between gap-3">
-            <label class="flex items-start gap-2.5 cursor-pointer flex-1 min-w-0">
-              <input
-                type="checkbox"
-                ${task.completed ? 'checked' : ''}
-                onchange="toggleTaskComplete('${safeId}')"
-                class="mt-1 rounded border-white/25 text-rose-500 focus:ring-0 cursor-pointer"
-              />
-              <div class="min-w-0 flex-1">
-                <div class="text-sm font-semibold break-words ${
-                  task.completed ? 'line-through text-slate-400' : 'text-white'
-                }">
-                  ${safeTitle}
+    if (!session) {
+        tasks = [];
+        if (container) {
+            container.innerHTML = `
+                <div class="text-center py-12 bg-slate-900/30 rounded-2xl border border-white/5 space-y-3 bloom-subtle-card">
+                    <p class="text-slate-400 text-sm">Please log in to view and manage your personal tasks.</p>
+                    <button type="button" onclick="switchTab('auth')" class="px-4 py-2 rounded-xl bg-rose-500 text-white text-xs font-semibold hover:bg-rose-600 transition-colors">
+                        Log In Now
+                    </button>
                 </div>
-                <div class="flex items-center gap-1.5 flex-wrap mt-1.5 text-xs">
-                  <span class="px-2 py-0.5 rounded-md bg-white/10 text-slate-200 border border-white/10">
-                    ${safeCategory}
-                  </span>
-                  <span class="px-2 py-0.5 rounded-md border ${getPriorityBadgeClasses(task.priority)}">
-                    ${safePriority}
-                  </span>
-                  <span class="text-slate-400">${durationMins}m • ${escapeHtml(timeLabel)}</span>
-                  ${
-                    task.syncedToCalendar
-                      ? '<span class="px-2 py-0.5 rounded-md bg-sky-500/20 text-sky-200 border border-sky-400/30">Synced</span>'
-                      : ''
-                  }
-                </div>
-              </div>
-            </label>
+            `;
+        }
+        const progressBar = document.getElementById('task-progress-bar');
+        const progressText = document.getElementById('task-progress-text');
+        if (progressBar) progressBar.style.width = '0%';
+        if (progressText) progressText.innerText = '0%';
+        return;
+    }
 
-            <button
-              type="button"
-              onclick="deleteTask('${safeId}')"
-              class="text-xs text-slate-400 hover:text-rose-300 px-2 py-1 rounded-md hover:bg-white/5 transition cursor-pointer shrink-0"
-              title="Delete task"
-            >
-              Delete
-            </button>
-          </div>
+    const { data, error } = await supabaseClient
+        .from('tasks')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-          <div class="flex items-center gap-2 flex-wrap pt-2.5 border-t border-white/10">
-            <button
-              type="button"
-              onclick="syncTaskToGoogleCalendar('${safeId}')"
-              class="bloom-lift px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-sky-500/25 to-indigo-500/25 hover:from-sky-500/35 hover:to-indigo-500/35 border border-sky-400/35 text-sky-100 transition cursor-pointer"
-            >
-              📅 Sync to Google Calendar
-            </button>
-
-            <button
-              type="button"
-              onclick="downloadTaskIcs('${safeId}')"
-              class="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/5 hover:bg-white/15 border border-white/10 text-slate-200 transition cursor-pointer"
-            >
-              ⬇ Download .ics
-            </button>
-          </div>
-        </article>
-      `;
-    })
-    .join('');
+    if (error) {
+        console.error('Error fetching tasks:', error);
+        return;
+    }
+    tasks = data || [];
+    renderTasks();
 }
 
-/* =========================================================
-   GOOGLE CALENDAR OAUTH 2.0 + REST API & .ICS FALLBACK
-   ========================================================= */
-function computeTaskWindow(task) {
-  let start = task.scheduledTime ? new Date(task.scheduledTime) : new Date();
-  if (!task.scheduledTime || Number.isNaN(start.getTime())) {
-    start = new Date();
-    start.setMinutes(0, 0, 0);
-    start.setHours(start.getHours() + 1);
-  }
-  const durationMs = (Number(task.duration) || 45) * 60 * 1000;
-  const end = new Date(start.getTime() + durationMs);
-  return { start, end };
+async function handleAddTask(e) {
+    e.preventDefault();
+
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) {
+        alert("You must be logged in to create tasks.");
+        switchTab('auth');
+        return;
+    }
+
+    const titleInput = document.getElementById('task-title');
+    const priorityInput = document.getElementById('task-priority');
+    const categoryInput = document.getElementById('task-category');
+    const scheduledInput = document.getElementById('task-scheduled-time');
+    const durationInput = document.getElementById('task-duration');
+    const autoSyncInput = document.getElementById('task-auto-gcal');
+
+    if (!titleInput || !priorityInput || !categoryInput) return;
+
+    const cleanTitle = titleInput.value.trim();
+    if (!cleanTitle) return;
+
+    const scheduledIso = scheduledInput && scheduledInput.value
+        ? new Date(scheduledInput.value).toISOString()
+        : null;
+    const durationMins = durationInput && Number(durationInput.value) > 0
+        ? Number(durationInput.value)
+        : 45;
+
+    const newTask = {
+        title: cleanTitle,
+        priority: priorityInput.value,
+        category: categoryInput.value,
+        completed: false,
+        user_id: session.user.id
+    };
+
+    const { data: insertedRows, error } = await supabaseClient
+        .from('tasks')
+        .insert([newTask])
+        .select();
+
+    if (error) {
+        console.error("Supabase Error:", error.message);
+        alert("Failed to save task: " + error.message);
+        return;
+    }
+
+    titleInput.value = '';
+    if (scheduledInput) scheduledInput.value = '';
+
+    await fetchTasks();
+
+    const createdTask = insertedRows?.[0] || tasks.find(t => t.title === cleanTitle);
+    if (createdTask) {
+        createdTask.scheduled_for = scheduledIso;
+        createdTask.duration_minutes = durationMins;
+        if (autoSyncInput && autoSyncInput.checked) {
+            await syncTaskToGoogleCalendar(createdTask.id, scheduledIso, durationMins);
+        }
+    }
+}
+
+async function toggleTask(id) {
+    const taskToToggle = tasks.find(t => t.id === id);
+    if (!taskToToggle) return;
+
+    const { error } = await supabaseClient
+        .from('tasks')
+        .update({ completed: !taskToToggle.completed })
+        .eq('id', id);
+
+    if (error) {
+        console.error('Error updating task:', error);
+        return;
+    }
+    fetchTasks();
+}
+
+async function deleteTask(id) {
+    const { error } = await supabaseClient
+        .from('tasks')
+        .delete()
+        .eq('id', id);
+
+    if (error) {
+        console.error('Error deleting task:', error);
+        return;
+    }
+    fetchTasks();
+}
+
+function filterTasks(priority) {
+    currentFilter = priority;
+    document.querySelectorAll('.filter-btn').forEach(b => {
+        b.classList.remove('bg-rose-500/20', 'border-rose-500', 'text-rose-300');
+        b.classList.add('bg-slate-900', 'border-white/10', 'text-slate-400');
+    });
+
+    const activeFilterBtn = document.getElementById(`filter-${priority}`);
+    if (activeFilterBtn) {
+        activeFilterBtn.classList.add('bg-rose-500/20', 'border-rose-500', 'text-rose-300');
+        activeFilterBtn.classList.remove('bg-slate-900', 'text-slate-400');
+    }
+
+    renderTasks();
+}
+
+// --- GOOGLE CALENDAR OAUTH 2.0 + REST API & .ICS FALLBACK FOR FOCUS TASKS ---
+function getTaskTimeRange(task, overrideStartIso = null, overrideDurationMins = null) {
+    const scheduledInput = document.getElementById('task-scheduled-time');
+    const durationInput = document.getElementById('task-duration');
+
+    let start = new Date();
+    const rawStart = overrideStartIso || task?.scheduled_for || (scheduledInput && scheduledInput.value);
+
+    if (rawStart) {
+        const parsed = new Date(rawStart);
+        if (!Number.isNaN(parsed.getTime())) {
+            start = parsed;
+        } else {
+            start.setMinutes(0, 0, 0);
+            start.setHours(start.getHours() + 1);
+        }
+    } else {
+        start.setMinutes(0, 0, 0);
+        start.setHours(start.getHours() + 1);
+    }
+
+    const mins = Number(
+        overrideDurationMins ||
+        task?.duration_minutes ||
+        (durationInput && durationInput.value) ||
+        45
+    ) || 45;
+
+    const end = new Date(start.getTime() + mins * 60 * 1000);
+    return { start, end, durationMins: mins };
 }
 
 function requestGoogleCalendarToken() {
-  return new Promise((resolve, reject) => {
-    if (!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.startsWith('YOUR_GOOGLE_OAUTH_CLIENT_ID')) {
-      reject(new Error('Set your real GOOGLE_CLIENT_ID at the top of script.js first.'));
-      return;
-    }
-
-    if (!window.google?.accounts?.oauth2) {
-      reject(new Error('Google Identity Services did not load yet. Check your connection or refresh.'));
-      return;
-    }
-
-    const tokenClient = window.google.accounts.oauth2.initTokenClient({
-      client_id: GOOGLE_CLIENT_ID,
-      scope: CALENDAR_SCOPE,
-      callback: (resp) => {
-        if (resp.error) {
-          reject(new Error(resp.error_description || resp.error));
-          return;
+    return new Promise((resolve, reject) => {
+        if (!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.startsWith('YOUR_GOOGLE_OAUTH_CLIENT_ID')) {
+            reject(new Error('Set your GOOGLE_CLIENT_ID in script.js first.'));
+            return;
         }
-        googleAccessToken = resp.access_token;
-        updateGoogleStatus('Calendar: Connected', 'connected');
-        resolve(googleAccessToken);
-      }
-    });
+        if (!window.google?.accounts?.oauth2) {
+            reject(new Error('Google Identity Services script is still loading. Please try again.'));
+            return;
+        }
 
-    tokenClient.requestAccessToken({ prompt: googleAccessToken ? '' : 'consent' });
-  });
+        const tokenClient = window.google.accounts.oauth2.initTokenClient({
+            client_id: GOOGLE_CLIENT_ID,
+            scope: GOOGLE_CALENDAR_SCOPE,
+            callback: (resp) => {
+                if (resp.error) {
+                    reject(new Error(resp.error_description || resp.error));
+                    return;
+                }
+                googleAccessToken = resp.access_token;
+                updateCalendarSyncStatus('Calendar: Connected', 'connected');
+                resolve(googleAccessToken);
+            }
+        });
+
+        tokenClient.requestAccessToken({ prompt: googleAccessToken ? '' : 'consent' });
+    });
 }
 
-async function syncTaskToGoogleCalendar(taskId) {
-  const task = tasks.find(t => t.id === taskId);
-  if (!task) return;
+async function syncTaskToGoogleCalendar(id, overrideStartIso = null, overrideDurationMins = null) {
+    const task = tasks.find(t => String(t.id) === String(id));
+    if (!task) return;
 
-  try {
-    updateGoogleStatus('Calendar: Syncing...', 'neutral');
-    const token = googleAccessToken || (await requestGoogleCalendarToken());
-    const { start, end } = computeTaskWindow(task);
-    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    const statusBox = document.getElementById(`gcal-status-${id}`);
 
-    const eventPayload = {
-      summary: `Bloom Focus: ${task.title}`,
-      description: `Category: ${task.category || 'Focus'} | Priority: ${(task.priority || 'medium').toUpperCase()} | Block: ${task.duration || 45} mins`,
-      start: {
-        dateTime: start.toISOString(),
-        timeZone
-      },
-      end: {
-        dateTime: end.toISOString(),
-        timeZone
-      }
+    try {
+        updateCalendarSyncStatus('Calendar: Syncing...', 'idle');
+        if (statusBox) {
+            statusBox.innerHTML = `<span class="text-[11px] text-sky-300 animate-pulse">Syncing to Google Calendar...</span>`;
+        }
+
+        const token = googleAccessToken || (await requestGoogleCalendarToken());
+        const { start, end, durationMins } = getTaskTimeRange(task, overrideStartIso, overrideDurationMins);
+        const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
+        const eventPayload = {
+            summary: `Bloom Focus: ${task.title}`,
+            description: `Category: ${task.category || 'Focus'} | Priority: ${(task.priority || 'medium').toUpperCase()} | Duration: ${durationMins} mins`,
+            start: {
+                dateTime: start.toISOString(),
+                timeZone
+            },
+            end: {
+                dateTime: end.toISOString(),
+                timeZone
+            }
+        };
+
+        const response = await fetch(
+            'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+            {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(eventPayload)
+            }
+        );
+
+        if (response.status === 401) {
+            googleAccessToken = null;
+            return syncTaskToGoogleCalendar(id, overrideStartIso, overrideDurationMins);
+        }
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.error?.message || `Calendar API error (${response.status})`);
+        }
+
+        const createdEvent = await response.json();
+        task.syncedToGoogleCalendar = true;
+        task.googleEventLink = createdEvent.htmlLink || '';
+        updateCalendarSyncStatus('Calendar: Synced', 'connected');
+
+        if (statusBox) {
+            statusBox.innerHTML = `
+                <div class="flex items-center justify-between gap-2 text-[11px] text-emerald-300">
+                    <span>Synced to Google Calendar (${start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })})</span>
+                    ${
+                        createdEvent.htmlLink
+                            ? `<a href="${escapeHtml(createdEvent.htmlLink)}" target="_blank" rel="noopener noreferrer" class="underline hover:text-emerald-200">Open Event</a>`
+                            : ''
+                    }
+                </div>
+            `;
+        }
+    } catch (err) {
+        console.error('Google Calendar sync failed:', err);
+        updateCalendarSyncStatus('Calendar: Check setup/auth', 'error');
+        if (statusBox) {
+            statusBox.innerHTML = `
+                <div class="flex items-center justify-between gap-2 text-[11px] text-rose-300">
+                    <span>Sync issue: ${escapeHtml(err.message)}</span>
+                    <button type="button" onclick="downloadTaskIcs('${escapeJsSingleQuote(String(id))}')" class="underline hover:text-rose-200">Use .ics instead</button>
+                </div>
+            `;
+        } else {
+            alert(`Google Calendar sync failed: ${err.message}`);
+        }
+    }
+}
+
+function downloadTaskIcs(id) {
+    const task = tasks.find(t => String(t.id) === String(id));
+    if (!task) return;
+
+    const { start, end, durationMins } = getTaskTimeRange(task);
+    const fmtUtc = d => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+    const cleanIcs = text =>
+        String(text ?? '')
+            .replace(/\\/g, '\\\\')
+            .replace(/;/g, '\\;')
+            .replace(/,/g, '\\,')
+            .replace(/\n/g, '\\n');
+
+    const icsLines = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//Bloom//Focus Tasks//EN',
+        'CALSCALE:GREGORIAN',
+        'METHOD:PUBLISH',
+        'BEGIN:VEVENT',
+        `UID:bloom-task-${task.id}-${Date.now()}@bloom.app`,
+        `DTSTAMP:${fmtUtc(new Date())}`,
+        `DTSTART:${fmtUtc(start)}`,
+        `DTEND:${fmtUtc(end)}`,
+        `SUMMARY:${cleanIcs(`Bloom Focus: ${task.title}`)}`,
+        `DESCRIPTION:${cleanIcs(`Category: ${task.category || 'Focus'} | Priority: ${(task.priority || 'medium').toUpperCase()} | Block: ${durationMins} mins`)}`,
+        'END:VEVENT',
+        'END:VCALENDAR'
+    ].join('\r\n');
+
+    const blob = new Blob([icsLines], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const slug =
+        String(task.title || 'bloom-task')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-|-$/g, '') || 'bloom-task';
+
+    link.href = url;
+    link.download = `${slug}.ics`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+// --- GEMINI AI MICRO-STEPS FOR TASKS ---
+async function fetchAiMicroSteps(taskTitle, elementId) {
+    const container = document.getElementById(elementId);
+    if (!container) return;
+
+    container.innerHTML = `<p class="text-xs text-teal-400 animate-pulse mt-2 flex items-center gap-1.5"><i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Generating BloomAI Micro-Steps...</p>`;
+    if (window.lucide) lucide.createIcons();
+
+    const prompt = `Break down this task into 3 short, actionable, youth-friendly micro-steps to reduce overwhelm: "${taskTitle}". Return only the 3 numbered steps (1., 2., 3.) as plain text lines without markdown bolding or stray brackets.`;
+
+    try {
+        const { data, error } = await supabaseClient.functions.invoke('gemini-proxy', {
+            body: { prompt: prompt }
+        });
+
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error.message || JSON.stringify(data.error));
+
+        const rawSteps = data?.candidates?.[0]?.content?.parts?.[0]?.text
+            || data?.reply
+            || "1. Review task details and requirements.\n2. Break it into smaller 10-minute blocks.\n3. Complete the very first small action.";
+        const stepsText = cleanModelMarkdown(rawSteps);
+        const escapedTitle = escapeJsSingleQuote(taskTitle);
+
+        container.innerHTML = `
+            <div class="mt-3 p-3.5 rounded-xl bg-slate-950/90 border border-teal-500/30 text-xs space-y-2 shadow-inner">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-teal-400 font-bold flex items-center gap-1">
+                            <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                            BloomAI Micro-Steps (Do just the first 1):
+                        </span>
+                        <span class="text-[10px] font-semibold bg-teal-500/15 text-teal-300 px-2 py-0.5 rounded border border-teal-500/30">Bloom AI</span>
+                    </div>
+                    <button type="button" onclick="fetchAiMicroSteps('${escapedTitle}', '${elementId}')" class="text-[11px] text-slate-400 hover:text-teal-300 flex items-center gap-1 transition-colors">
+                        <i data-lucide="refresh-cw" class="w-3 h-3"></i>
+                        <span>Regenerate with AI</span>
+                    </button>
+                </div>
+                <div class="text-slate-200 leading-relaxed whitespace-pre-line">${escapeHtml(stepsText)}</div>
+            </div>
+        `;
+    } catch (err) {
+        console.error("Micro-steps error:", err);
+        const escapedTitle = escapeJsSingleQuote(taskTitle);
+        container.innerHTML = `
+            <div class="mt-2 flex items-center justify-between text-xs text-rose-400">
+                <span>AI Error: ${escapeHtml(err.message)}</span>
+                <button type="button" onclick="fetchAiMicroSteps('${escapedTitle}', '${elementId}')" class="underline hover:text-rose-300">Retry</button>
+            </div>
+        `;
+    }
+    if (window.lucide) lucide.createIcons();
+}
+
+function renderTasks() {
+    const container = document.getElementById('tasks-container');
+    if (!container) return;
+
+    let filtered = tasks;
+    if (currentFilter !== 'all') {
+        filtered = tasks.filter(t => t.priority === currentFilter);
+    }
+
+    const completedCount = tasks.filter(t => t.completed).length;
+    const progressPct = tasks.length ? Math.round((completedCount / tasks.length) * 100) : 0;
+
+    const progressBar = document.getElementById('task-progress-bar');
+    const progressText = document.getElementById('task-progress-text');
+    if (progressBar) progressBar.style.width = `${progressPct}%`;
+    if (progressText) progressText.innerText = `${progressPct}%`;
+
+    if (filtered.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-12 bg-slate-900/30 rounded-2xl border border-white/5 bloom-subtle-card">
+                <p class="text-slate-400 text-sm">No tasks found. Relax or add a new goal!</p>
+            </div>
+        `;
+        return;
+    }
+
+    const priorityBadges = {
+        high: '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-500/20 text-red-300 border border-red-500/30">HIGH</span>',
+        medium: '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">MEDIUM</span>',
+        low: '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">LOW</span>'
     };
 
-    const response = await fetch(
-      'https://www.googleapis.com/calendar/v3/calendars/primary/events',
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
+    container.innerHTML = filtered.map(t => {
+        const escapedTitle = escapeJsSingleQuote(t.title);
+        const escapedId = escapeJsSingleQuote(String(t.id));
+        return `
+        <div class="p-4 rounded-2xl bg-slate-900/80 border ${t.completed ? 'border-slate-800 opacity-60' : 'border-white/10'} transition-all hover:border-white/20 bloom-subtle-card space-y-2.5">
+            <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center space-x-3 min-w-0">
+                    <button type="button" onclick="toggleTask(${t.id})" class="p-1 rounded-lg shrink-0 ${t.completed ? 'bg-rose-500 text-white' : 'border border-slate-600 hover:border-rose-400'}">
+                        <i data-lucide="${t.completed ? 'check-square' : 'square'}" class="w-5 h-5"></i>
+                    </button>
+                    <div class="min-w-0">
+                        <p class="text-sm font-semibold text-white truncate ${t.completed ? 'line-through text-slate-500' : ''}">${escapeHtml(t.title)}</p>
+                        <span class="text-xs text-slate-400">${escapeHtml(t.category)}</span>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2 shrink-0">
+                    ${priorityBadges[t.priority] || priorityBadges.medium}
+                    <button type="button" onclick="deleteTask(${t.id})" class="text-slate-500 hover:text-red-400 p-1" title="Delete task">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-white/5">
+                <button type="button" onclick="fetchAiMicroSteps('${escapedTitle}', 'ai-steps-${t.id}')" class="text-xs text-teal-400 hover:text-teal-300 font-medium flex items-center gap-1.5 transition-colors">
+                    <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                    <span>Generate BloomAI Micro-Steps</span>
+                </button>
+
+                <div class="flex items-center gap-2 flex-wrap">
+                    <button
+                        type="button"
+                        onclick="syncTaskToGoogleCalendar('${escapedId}')"
+                        class="text-xs px-2.5 py-1 rounded-lg bg-sky-500/15 hover:bg-sky-500/25 border border-sky-400/35 text-sky-200 font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                        <i data-lucide="calendar-plus" class="w-3.5 h-3.5"></i>
+                        <span>Sync to Google Calendar</span>
+                    </button>
+                    <button
+                        type="button"
+                        onclick="downloadTaskIcs('${escapedId}')"
+                        class="text-xs px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 transition-colors cursor-pointer"
+                        title="Download .ics calendar file"
+                    >
+                        .ics
+                    </button>
+                </div>
+            </div>
+
+            <div id="gcal-status-${t.id}"></div>
+            <div id="ai-steps-${t.id}"></div>
+        </div>
+        `;
+    }).join('');
+
+    if (window.lucide) lucide.createIcons();
+}
+
+// POP CULTURE / MOVIE INSPIRATIONAL QUOTES (30s Rotation)
+const quotes = [
+    { text: '"It’s not about having time, it’s about making time."', source: 'Captain America (Avengers: Endgame)' },
+    { text: '"The magic you’re looking for is in the work you’re avoiding."', source: 'Modern Mindset Quote' },
+    { text: '"You are stronger than you know, and your story is far from over."', source: 'Spider-Man: Into the Spider-Verse' },
+    { text: '"Do or do not. There is no try."', source: 'Yoda (Star Wars)' },
+    { text: '"Your focus determines your reality."', source: 'Qui-Gon Jinn (Star Wars)' },
+    { text: '"Small steps every single day accumulate into massive life changes."', source: 'Bloom Philosophy' }
+];
+
+let quoteIndex = 0;
+
+function rotateQuotes() {
+    const quoteEl = document.getElementById('inspirational-quote');
+    const sourceEl = document.getElementById('quote-source');
+    if (!quoteEl || !sourceEl) return;
+
+    quoteEl.style.opacity = '0';
+    setTimeout(() => {
+        quoteIndex = (quoteIndex + 1) % quotes.length;
+        quoteEl.innerText = quotes[quoteIndex].text;
+        sourceEl.innerText = `— ${quotes[quoteIndex].source}`;
+        quoteEl.style.opacity = '1';
+    }, 500);
+}
+
+setInterval(rotateQuotes, 30000);
+
+// TAB NAVIGATION SYSTEM
+function switchTab(tabId) {
+    const tabs = ['auth', 'home', 'tasks', 'learn', 'guide-detail', 'chat'];
+    tabs.forEach(t => {
+        const view = document.getElementById(`view-${t}`);
+        const navBtn = document.getElementById(`nav-${t}`);
+        const mnavBtn = document.getElementById(`mnav-${t}`);
+
+        if (view) view.classList.add('hidden');
+        if (navBtn) {
+            navBtn.classList.remove('bg-white/15', 'text-white');
+            navBtn.classList.add('text-slate-400');
+        }
+        if (mnavBtn) {
+            mnavBtn.classList.remove('text-rose-400');
+            mnavBtn.classList.add('text-slate-400');
+        }
+    });
+
+    const activeView = document.getElementById(`view-${tabId}`);
+    const activeNav = document.getElementById(`nav-${tabId}`);
+    const activeMNav = document.getElementById(`mnav-${tabId}`);
+    const mainEl = document.getElementById('main-content');
+
+    if (activeView) activeView.classList.remove('hidden');
+    if (mainEl) mainEl.classList.toggle('bloom-chat-active', tabId === 'chat');
+    if (activeNav) {
+        activeNav.classList.add('bg-white/15', 'text-white');
+        activeNav.classList.remove('text-slate-400');
+    }
+    if (activeMNav) {
+        activeMNav.classList.add('text-rose-400');
+        activeMNav.classList.remove('text-slate-400');
+    }
+
+    if (tabId === 'tasks') fetchTasks();
+    if (tabId === 'learn') switchCategory('career');
+    if (tabId === 'chat') loadChatSessions();
+
+    if (window.lucide) lucide.createIcons();
+}
+
+// --- GUIDANCE LIBRARY WITH TOPIC DETAIL, VIDEO, M4A PODCAST, TRANSCRIPT & BLOOM AI ---
+const GUIDE_STORAGE_BUCKET = 'guidance_media';
+let activeGuideTopic = null;
+
+function getSupabasePublicFileUrl(filePath) {
+    if (!filePath) return '';
+    if (/^https?:\/\//i.test(filePath)) return filePath;
+    const { data } = supabaseClient.storage.from(GUIDE_STORAGE_BUCKET).getPublicUrl(filePath);
+    return data?.publicUrl || '';
+}
+
+const learningData = {
+    career: [
+        {
+            id: 'balancing-high-school-late-night-shifts',
+            title: 'Balancing High School & Late Night Shifts',
+            desc: 'Practical strategies to communicate with managers about homework deadlines, protect sleep, and avoid shift burnout.',
+            type: 'Article + Video + Podcast • 4 min read',
+            videoPath: 'videos/balancing-high-school-late-night-shifts.mp4.mp4',
+            podcastPath: 'https://xmqmrkqyjnbupyalhnib.supabase.co/storage/v1/object/public/guidance_media/podcasts/balancing-high-school-late-night-shifts.m4a.m4a',
+            transcriptPath: 'videos/Studying With a Job_Transcript.txt',
+            bloomPrompt: `Walk me through "Balancing High School & Late Night Shifts" in a warm, conversational way. Break down realistic habits for handling schoolwork, late shifts, and energy without burning out, and ask how it fits my week.`
         },
-        body: JSON.stringify(eventPayload)
-      }
-    );
+        {
+            id: 'resume-zero-experience',
+            title: 'Building a Resume with Zero Prior Experience',
+            desc: 'How to frame coursework, self-taught tech projects, and resilience into top job applications.',
+            type: 'Guide • 6 min read',
+            transcriptText: 'Guide notes on turning projects, schoolwork, and consistency into strong resume bullet points.',
+            bloomPrompt: 'Help me turn my real projects, schoolwork, and everyday experience into strong resume bullet points in a friendly, conversational way.'
+        }
+    ],
+    emotional: [
+        {
+            id: 'adult-counselors-disconnect',
+            title: 'Why Adult Counselors Feel Disconnected & What To Do',
+            desc: 'Understanding generational advice gaps and taking ownership of your self-care journey.',
+            type: 'Perspective • 5 min read',
+            transcriptText: 'Perspective guide on finding support that actually fits where you are right now.',
+            bloomPrompt: 'Talk through how to get practical support and stay grounded when advice feels disconnected from real life.'
+        },
+        {
+            id: 'late-night-overthinking',
+            title: 'Overcoming Late-Night Overthinking',
+            desc: 'Actionable cognitive exercises when anxiety keeps you up past 2:00 AM.',
+            type: 'Mental Health • 3 min read',
+            transcriptText: 'Simple wind-down steps to quiet racing thoughts late at night.',
+            bloomPrompt: 'Help me wind down racing thoughts late at night with calm, practical steps.'
+        }
+    ],
+    personal: [
+        {
+            id: 'five-minute-rule',
+            title: 'The 5-Minute Rule Against Procrastination',
+            desc: 'Trick your brain into starting tasks without feeling overwhelmed by big projects.',
+            type: 'Habit Builder • 3 min read',
+            transcriptText: 'Start with just five minutes of low-pressure action to build momentum.',
+            bloomPrompt: 'Help me use the 5-minute rule to get started on something I have been putting off.'
+        }
+    ],
+    destress: [
+        {
+            id: 'breathing-478',
+            title: '4-7-8 Breathing Technique',
+            desc: 'Inhale for 4s, hold for 7s, exhale for 8s to instantly lower heart rate.',
+            type: 'Interactive Exercise',
+            transcriptText: 'Inhale quietly through your nose for 4 seconds, hold for 7 seconds, and exhale completely for 8 seconds.',
+            bloomPrompt: 'Guide me through a calm 4-7-8 breathing reset and help me decompress.'
+        }
+    ]
+};
 
-    if (response.status === 401) {
-      googleAccessToken = null;
-      return syncTaskToGoogleCalendar(taskId);
+function switchCategory(cat) {
+    document.querySelectorAll('.cat-btn').forEach(b => {
+        b.classList.remove('bg-rose-500', 'text-white');
+        b.classList.add('bg-slate-900', 'text-slate-400');
+    });
+
+    const activeCatBtn = document.getElementById(`cat-${cat}`);
+    if (activeCatBtn) {
+        activeCatBtn.classList.add('bg-rose-500', 'text-white');
+        activeCatBtn.classList.remove('bg-slate-900', 'text-slate-400');
     }
 
-    if (!response.ok) {
-      const errBody = await response.json().catch(() => ({}));
-      throw new Error(errBody.error?.message || `Google Calendar request failed (${response.status})`);
+    const container = document.getElementById('learning-content');
+    if (!container) return;
+
+    const items = learningData[cat] || [];
+    container.innerHTML = items.map(item => `
+        <div class="p-6 rounded-2xl bg-slate-900/80 border border-white/10 hover:border-rose-500/40 transition-all flex flex-col justify-between bloom-subtle-card">
+            <div>
+                <span class="text-xs font-bold text-rose-400 uppercase tracking-wider">${escapeHtml(item.type)}</span>
+                <h3 class="text-lg font-bold text-white mt-2 mb-2">${escapeHtml(item.title)}</h3>
+                <p class="text-slate-400 text-sm leading-relaxed mb-4">${escapeHtml(item.desc)}</p>
+            </div>
+            <button type="button" onclick="openGuideTopic('${escapeJsSingleQuote(cat)}', '${escapeJsSingleQuote(item.id)}')" class="w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-semibold transition-colors">
+                Open Topic Guide
+            </button>
+        </div>
+    `).join('');
+}
+
+async function openGuideTopic(categoryKey, topicId) {
+    const topic = (learningData[categoryKey] || []).find(item => item.id === topicId);
+    if (!topic) return;
+
+    activeGuideTopic = topic;
+
+    const tabs = ['auth', 'home', 'tasks', 'learn', 'guide-detail', 'chat'];
+    tabs.forEach(t => {
+        const view = document.getElementById(`view-${t}`);
+        if (view) view.classList.add('hidden');
+    });
+
+    const detailView = document.getElementById('view-guide-detail');
+    if (detailView) detailView.classList.remove('hidden');
+
+    const titleEl = document.getElementById('guide-detail-title');
+    const descEl = document.getElementById('guide-detail-desc');
+    const badgeEl = document.getElementById('guide-detail-badge');
+    const videoEl = document.getElementById('guide-video-player');
+    const videoDlEl = document.getElementById('guide-video-download');
+    const audioEl = document.getElementById('guide-audio-player');
+    const transcriptBox = document.getElementById('guide-transcript-box');
+
+    if (titleEl) titleEl.textContent = topic.title;
+    if (descEl) descEl.textContent = topic.desc;
+    if (badgeEl) badgeEl.textContent = topic.type;
+
+    const videoUrl = getSupabasePublicFileUrl(topic.videoPath);
+    if (videoEl) {
+        videoEl.src = videoUrl;
+        videoEl.load();
+    }
+    if (videoDlEl) {
+        videoDlEl.href = videoUrl || '#';
     }
 
-    const created = await response.json();
-    tasks = tasks.map(t => (t.id === taskId ? { ...t, syncedToCalendar: true } : t));
-    saveTasks();
-    renderTasks();
-    updateGoogleStatus('Calendar: Synced', 'connected');
+    const audioUrl = getSupabasePublicFileUrl(topic.podcastPath);
+    if (audioEl) {
+        audioEl.src = audioUrl;
+        audioEl.load();
+    }
 
-    appendBloomMessage(
-      `Synced **${task.title}** to Google Calendar (${start.toLocaleString([], {
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit'
-      })}).`
-    );
+    let resolvedTranscript = topic.transcriptText || '';
+    if (topic.transcriptPath) {
+        try {
+            const txUrl = getSupabasePublicFileUrl(topic.transcriptPath);
+            if (txUrl) {
+                const resp = await fetch(txUrl);
+                if (resp.ok) {
+                    const remoteText = await resp.text();
+                    if (remoteText.trim()) resolvedTranscript = remoteText.trim();
+                }
+            }
+        } catch (err) {
+            console.warn('Using local fallback transcript:', err);
+        }
+    }
 
-    if (created.htmlLink) {
-      window.open(created.htmlLink, '_blank', 'noopener,noreferrer');
+    topic.resolvedTranscript = resolvedTranscript;
+    if (transcriptBox) {
+        transcriptBox.textContent = resolvedTranscript || 'Transcript coming soon.';
+    }
+
+    if (window.lucide) lucide.createIcons();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function triggerFileDownload(url, fallbackText, filename) {
+    try {
+        if (url && /^https?:\/\//i.test(url)) {
+            const response = await fetch(url);
+            if (response.ok) {
+                const blob = await response.blob();
+                const blobUrl = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = blobUrl;
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 1500);
+                return;
+            }
+        }
+    } catch (err) {
+        console.warn('Direct fetch download fallback:', err);
+    }
+
+    if (fallbackText) {
+        const blob = new Blob([fallbackText], { type: 'text/plain;charset=utf-8' });
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 1500);
+    }
+}
+
+async function downloadActiveGuidePodcast() {
+    if (!activeGuideTopic) return;
+    const audioUrl = getSupabasePublicFileUrl(activeGuideTopic.podcastPath);
+    await triggerFileDownload(audioUrl, null, `${activeGuideTopic.id}.m4a`);
+}
+
+async function downloadActiveGuideTranscript() {
+    if (!activeGuideTopic) return;
+    const txUrl = getSupabasePublicFileUrl(activeGuideTopic.transcriptPath);
+    await triggerFileDownload(txUrl, activeGuideTopic.resolvedTranscript || activeGuideTopic.transcriptText || '', `${activeGuideTopic.id}-transcript.txt`);
+}
+
+function explainActiveGuideWithBloomAI() {
+    if (!activeGuideTopic) {
+        switchTab('chat');
+        return;
+    }
+
+    const transcriptSnippet = (activeGuideTopic.resolvedTranscript || activeGuideTopic.transcriptText || '').slice(0, 3500);
+    const basePrompt = activeGuideTopic.bloomPrompt || `Explain "${activeGuideTopic.title}" in a warm, conversational way.`;
+    const fullPrompt = transcriptSnippet
+        ? `${basePrompt}\n\nTranscript context:\n${transcriptSnippet}`
+        : basePrompt;
+
+    switchTab('chat');
+    const input = document.getElementById('chat-input');
+    if (input) {
+        input.value = fullPrompt;
+        input.focus();
+    }
+}
+
+// --- MULTIMODAL FILE ATTACHMENTS (WITH FAST IMAGE COMPRESSION) & VOICE INPUT ---
+let attachedFiles = [];
+
+function compressImage(file, maxWidth = 1024, quality = 0.8) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+                if (width > maxWidth) {
+                    height = Math.round((height * maxWidth) / width);
+                    width = maxWidth;
+                }
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                const dataUrl = canvas.toDataURL('image/jpeg', quality);
+                resolve({
+                    name: file.name,
+                    type: 'image/jpeg',
+                    data: dataUrl.split(',')[1]
+                });
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+function getFileMimeType(file) {
+    if (file.type) return file.type;
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    const map = {
+        txt: 'text/plain',
+        md: 'text/plain',
+        csv: 'text/csv',
+        js: 'text/javascript',
+        html: 'text/html',
+        css: 'text/css',
+        json: 'application/json',
+        pdf: 'application/pdf'
+    };
+    return map[ext] || 'text/plain';
+}
+
+async function handleFileSelection(e) {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    for (const file of files) {
+        if (file.size > 8 * 1024 * 1024) {
+            alert(`"${file.name}" is larger than 8MB. Please pick a smaller file.`);
+            continue;
+        }
+
+        if (file.type.startsWith('image/')) {
+            const compressed = await compressImage(file);
+            attachedFiles.push(compressed);
+            renderAttachmentsPreview();
+        } else {
+            const mime = getFileMimeType(file);
+            await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (uploadEvent) => {
+                    attachedFiles.push({
+                        name: file.name,
+                        type: mime,
+                        data: String(uploadEvent.target.result || '').split(',')[1] || ''
+                    });
+                    renderAttachmentsPreview();
+                    resolve();
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+    }
+    e.target.value = '';
+}
+
+function renderAttachmentsPreview() {
+    const previewContainer = document.getElementById('chat-attachments-preview');
+    if (!previewContainer) return;
+
+    if (attachedFiles.length === 0) {
+        previewContainer.classList.add('hidden');
+        previewContainer.innerHTML = '';
+        return;
+    }
+
+    previewContainer.classList.remove('hidden');
+    previewContainer.innerHTML = attachedFiles.map((f, index) => `
+        <div class="flex items-center gap-2 bg-slate-950 border border-rose-500/30 px-3 py-1.5 rounded-xl text-xs text-slate-200">
+            <i data-lucide="${f.type.startsWith('image/') ? 'image' : 'file-text'}" class="w-3.5 h-3.5 text-rose-400"></i>
+            <span class="truncate max-w-[140px]">${escapeHtml(f.name)}</span>
+            <button type="button" onclick="removeAttachment(${index})" class="text-slate-500 hover:text-rose-400 ml-1">
+                <i data-lucide="x" class="w-3 h-3"></i>
+            </button>
+        </div>
+    `).join('');
+    if (window.lucide) lucide.createIcons();
+}
+
+function removeAttachment(index) {
+    attachedFiles.splice(index, 1);
+    renderAttachmentsPreview();
+}
+
+let recognition = null;
+let isRecording = false;
+
+function toggleVoiceRecording() {
+    const micBtn = document.getElementById('mic-btn');
+    const input = document.getElementById('chat-input');
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        alert("Speech recognition is not supported in this browser. Try Chrome or Edge!");
+        return;
+    }
+
+    if (isRecording && recognition) {
+        recognition.stop();
+        return;
+    }
+
+    recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+        isRecording = true;
+        if (micBtn) micBtn.classList.add('bg-rose-500/20', 'text-rose-400', 'animate-pulse');
+        if (input) input.placeholder = "Listening... Speak now...";
+    };
+
+    recognition.onresult = (event) => {
+        let transcript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+            transcript += event.results[i][0].transcript;
+        }
+        if (input) input.value = transcript;
+    };
+
+    recognition.onerror = (event) => {
+        console.error("Speech recognition error:", event.error);
+        stopVoiceUI();
+    };
+
+    recognition.onend = () => {
+        stopVoiceUI();
+        if (input && input.value.trim().length > 0) {
+            handleSendMessage(new Event('submit'));
+        }
+    };
+
+    recognition.start();
+}
+
+function stopVoiceUI() {
+    isRecording = false;
+    const micBtn = document.getElementById('mic-btn');
+    const input = document.getElementById('chat-input');
+    if (micBtn) micBtn.classList.remove('bg-rose-500/20', 'text-rose-400', 'animate-pulse');
+    if (input) input.placeholder = "Ask Bloom anything...";
+}
+
+// Clean stray model bracket/asterisk artifacts outside code fences & tables
+function cleanModelMarkdown(rawText) {
+    let text = String(rawText ?? '').trim();
+    if (!text) return '';
+
+    const codeFences = [];
+    text = text.replace(/```[\s\S]*?```/g, (block) => {
+        const token = `@@CODE_FENCE_${codeFences.length}@@`;
+        codeFences.push(block);
+        return token;
+    });
+
+    text = text.replace(/\[\s*\]/g, '');
+    text = text.replace(/\*{4,}/g, '**');
+    text = text.replace(/(?<!\*)\*\*\*([^\n*]+?)\*\*\*(?!\*)/g, '**$1**');
+
+    codeFences.forEach((block, idx) => {
+        text = text.replace(`@@CODE_FENCE_${idx}@@`, block);
+    });
+
+    return text.trim();
+}
+
+function formatAiMessageContent(rawText) {
+    const cleaned = cleanModelMarkdown(rawText);
+    if (!cleaned) return '<p>No response returned.</p>';
+
+    const mermaidBlocks = [];
+    let processedText = cleaned.replace(/```mermaid\s*([\s\S]*?)```/g, (match, code) => {
+        const placeholder = `%%MERMAID_BLOCK_${mermaidBlocks.length}%%`;
+        mermaidBlocks.push(`
+            <div class="my-3 p-4 rounded-2xl bg-slate-950 border border-rose-500/30 overflow-x-auto shadow-inner">
+                <div class="text-[10px] font-bold uppercase tracking-wider text-rose-400 mb-2 flex items-center gap-1.5">
+                    <i data-lucide="git-branch" class="w-3.5 h-3.5"></i>
+                    <span>Bloom Visual Roadmap</span>
+                </div>
+                <div class="mermaid flex justify-center">${escapeHtml(code.trim())}</div>
+            </div>
+        `);
+        return placeholder;
+    });
+
+    let html = '';
+    try {
+        html = window.marked
+            ? marked.parse(processedText, { breaks: true, gfm: true })
+            : `<p>${escapeHtml(processedText).replace(/\n/g, '<br>')}</p>`;
+    } catch {
+        html = `<p>${escapeHtml(processedText).replace(/\n/g, '<br>')}</p>`;
+    }
+
+    mermaidBlocks.forEach((block, idx) => {
+        html = html.replace(`%%MERMAID_BLOCK_${idx}%%`, block);
+    });
+
+    return html;
+}
+
+// --- MULTI-CHAT SESSIONS WITH SUPABASE ---
+let activeChatSessionId = null;
+let chatSessions = [];
+
+async function loadChatSessions() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const listContainer = document.getElementById('chat-sessions-list');
+    const chatBox = document.getElementById('chat-messages');
+
+    if (!session) {
+        if (listContainer) listContainer.innerHTML = `<p class="text-xs text-slate-500 p-2 text-center">Sign in to save chat history</p>`;
+        if (chatBox) {
+            chatBox.innerHTML = `
+                <div class="flex items-start space-x-3">
+                    <div class="w-8 h-8 rounded-full bg-rose-500/20 flex items-center justify-center border border-rose-500/40 shrink-0">
+                        <i data-lucide="bot" class="w-4 h-4 text-rose-400"></i>
+                    </div>
+                    <div class="p-4 rounded-2xl rounded-tl-sm bg-slate-900 border border-white/10 text-sm text-slate-200 max-w-[85%] bloom-chat-bubble-ai">
+                        Hey! I'm BloomAI. You can chat with me right now, or log in to save multiple chat threads across devices.
+                    </div>
+                </div>
+            `;
+            if (window.lucide) lucide.createIcons();
+        }
+        return;
+    }
+
+    const { data, error } = await supabaseClient
+        .from('chat_sessions')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        console.error('Error loading chat sessions:', error);
+        return;
+    }
+
+    chatSessions = data || [];
+    renderChatSessionsList();
+
+    if (chatSessions.length > 0) {
+        if (!activeChatSessionId || !chatSessions.some(s => s.id === activeChatSessionId)) {
+            await selectChatSession(chatSessions[0].id);
+        } else {
+            await selectChatSession(activeChatSessionId);
+        }
     } else {
-      alert(`Synced "${task.title}" to Google Calendar!`);
+        await createNewChatSession();
     }
-  } catch (err) {
-    console.error('Google Calendar sync error:', err);
-    updateGoogleStatus('Calendar: Needs setup/auth', 'error');
-    alert(`Could not sync to Google Calendar: ${err.message}`);
-  }
 }
 
-function downloadTaskIcs(taskId) {
-  const task = tasks.find(t => t.id === taskId);
-  if (!task) return;
+function renderChatSessionsList() {
+    const listContainer = document.getElementById('chat-sessions-list');
+    if (!listContainer) return;
 
-  const { start, end } = computeTaskWindow(task);
-  const formatIcsUtc = date =>
-    date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
-  const sanitizeIcsText = text =>
-    String(text || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+    if (chatSessions.length === 0) {
+        listContainer.innerHTML = `<p class="text-xs text-slate-500 p-2 text-center">No chats yet.</p>`;
+        return;
+    }
 
-  const icsContent = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//Bloom//Focus Tasks//EN',
-    'CALSCALE:GREGORIAN',
-    'METHOD:PUBLISH',
-    'BEGIN:VEVENT',
-    `UID:bloom-${task.id}-${Date.now()}@bloom.app`,
-    `DTSTAMP:${formatIcsUtc(new Date())}`,
-    `DTSTART:${formatIcsUtc(start)}`,
-    `DTEND:${formatIcsUtc(end)}`,
-    `SUMMARY:${sanitizeIcsText(`Bloom Focus: ${task.title}`)}`,
-    `DESCRIPTION:${sanitizeIcsText(
-      `Category: ${task.category || 'Focus'} | Priority: ${(task.priority || 'medium').toUpperCase()}`
-    )}`,
-    'END:VEVENT',
-    'END:VCALENDAR'
-  ].join('\r\n');
-
-  const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  const slug =
-    String(task.title || 'bloom-task')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '') || 'bloom-task';
-
-  link.href = url;
-  link.download = `${slug}.ics`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1500);
+    listContainer.innerHTML = chatSessions.map(s => {
+        const isActive = s.id === activeChatSessionId;
+        const safeTitle = escapeHtml(s.title || 'New Chat');
+        return `
+            <div class="group flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-colors ${isActive ? 'bg-rose-500/20 border border-rose-500/40 text-white' : 'hover:bg-white/5 text-slate-400 border border-transparent'}" onclick="selectChatSession('${s.id}')">
+                <div class="flex items-center gap-2 truncate pr-1 flex-1">
+                    <i data-lucide="message-square" class="w-3.5 h-3.5 shrink-0 ${isActive ? 'text-rose-400' : 'text-slate-500'}"></i>
+                    <span class="text-xs font-medium truncate">${safeTitle}</span>
+                </div>
+                <button type="button" onclick="event.stopPropagation(); deleteChatSession('${s.id}')" class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 p-1 rounded transition-opacity" title="Delete chat">
+                    <i data-lucide="trash-2" class="w-3 h-3"></i>
+                </button>
+            </div>
+        `;
+    }).join('');
+    if (window.lucide) lucide.createIcons();
 }
 
-/* =========================================================
-   GUIDANCE LIBRARY
-   ========================================================= */
-function populateGuidanceDropdown() {
-  const selectEl = document.getElementById('guidance-topic-select');
-  if (!selectEl) return;
+async function createNewChatSession() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) return;
 
-  selectEl.innerHTML = GUIDANCE_TOPICS.map(
-    (topic, index) => `<option value="${index}">${escapeHtml(topic.title)}</option>`
-  ).join('');
-  selectEl.value = String(currentGuidanceIndex);
+    const { data, error } = await supabaseClient
+        .from('chat_sessions')
+        .insert([{ title: 'New Chat', user_id: session.user.id }])
+        .select()
+        .single();
+
+    if (error) {
+        console.error('Error creating chat session:', error);
+        return;
+    }
+
+    activeChatSessionId = data.id;
+    chatSessions.unshift(data);
+    renderChatSessionsList();
+    renderWelcomeMessage();
 }
 
-function renderGuidanceTopic(index) {
-  const clamped =
-    Number.isInteger(index) && index >= 0 && index < GUIDANCE_TOPICS.length ? index : 0;
-  currentGuidanceIndex = clamped;
-  saveGuidanceIndex(clamped);
+async function deleteChatSession(sessionId) {
+    const { error } = await supabaseClient
+        .from('chat_sessions')
+        .delete()
+        .eq('id', sessionId);
 
-  const topic = GUIDANCE_TOPICS[clamped];
-  const titleEl = document.getElementById('guidance-topic-title');
-  const videoEl = document.getElementById('guidance-video');
-  const audioEl = document.getElementById('guidance-audio');
-  const transcriptEl = document.getElementById('guidance-transcript');
-  const statusEl = document.getElementById('guidance-status');
-  const selectEl = document.getElementById('guidance-topic-select');
+    if (error) {
+        console.error('Error deleting session:', error);
+        return;
+    }
 
-  if (selectEl) selectEl.value = String(clamped);
-  if (titleEl) titleEl.textContent = topic.title;
-  if (transcriptEl) transcriptEl.textContent = topic.transcript || 'No transcript available.';
+    chatSessions = chatSessions.filter(s => s.id !== sessionId);
+    if (activeChatSessionId === sessionId) {
+        activeChatSessionId = chatSessions.length > 0 ? chatSessions[0].id : null;
+    }
 
-  if (videoEl) {
-    if (topic.videoUrl) {
-      videoEl.src = topic.videoUrl;
-      videoEl.classList.remove('hidden');
+    renderChatSessionsList();
+    if (activeChatSessionId) {
+        await selectChatSession(activeChatSessionId);
     } else {
-      videoEl.removeAttribute('src');
-      videoEl.load();
+        await createNewChatSession();
     }
-  }
-
-  if (audioEl) {
-    if (topic.audioUrl) {
-      audioEl.src = topic.audioUrl;
-    } else {
-      audioEl.removeAttribute('src');
-      audioEl.load();
-    }
-  }
-
-  if (statusEl) {
-    statusEl.textContent =
-      topic.videoUrl || topic.audioUrl ? 'Media ready' : 'Transcript ready';
-  }
 }
 
-function selectGuidanceTopic(value) {
-  const idx = Number(value);
-  renderGuidanceTopic(Number.isNaN(idx) ? 0 : idx);
-}
+async function selectChatSession(sessionId) {
+    activeChatSessionId = sessionId;
+    renderChatSessionsList();
 
-function explainCurrentTranscriptWithBloomAI() {
-  const topic = GUIDANCE_TOPICS[currentGuidanceIndex] || GUIDANCE_TOPICS[0];
-  setActiveSection('all');
-  appendBloomMessage(
-    `Key takeaway for **${topic.title}**: ${topic.transcript}`
-  );
-}
+    const chatBox = document.getElementById('chat-messages');
+    if (!chatBox) return;
 
-/* =========================================================
-   BLOOM AI CHAT PANEL
-   ========================================================= */
-function appendBloomMessage(text) {
-  const logEl = document.getElementById('bloom-chat-log');
-  if (!logEl) return;
-
-  const bubble = document.createElement('div');
-  bubble.className = 'bloom-chat-bubble-ai text-sm';
-  bubble.innerHTML = escapeHtml(text).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  logEl.appendChild(bubble);
-  logEl.scrollTop = logEl.scrollHeight;
-}
-
-function handleBloomChatSubmit(event) {
-  event.preventDefault();
-  const inputEl = document.getElementById('bloom-chat-input');
-  if (!inputEl) return;
-
-  const promptText = inputEl.value.trim();
-  if (!promptText) return;
-
-  appendBloomMessage(`You: ${promptText}`);
-  inputEl.value = '';
-
-  const openTasks = tasks.filter(t => !t.completed).length;
-  appendBloomMessage(
-    `Bloom AI: You currently have **${openTasks}** active focus ${
-      openTasks === 1 ? 'task' : 'tasks'
-    }. Pick one to tackle first and hit **Sync to Google Calendar** to lock in time for it.`
-  );
-}
-
-/* =========================================================
-   INITIALIZATION
-   ========================================================= */
-document.addEventListener('DOMContentLoaded', () => {
-  setActiveSection('all');
-  populateGuidanceDropdown();
-  renderGuidanceTopic(currentGuidanceIndex);
-  renderTasks();
-});
+    chat

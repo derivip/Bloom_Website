@@ -1,7 +1,7 @@
 // BLOOM APPLICATION SCRIPT (2026 EDITION - SUPABASE, GEMINI AI, MULTIMODAL, MULTI-CHAT & FOCUS RADIO)
 
 // SUPABASE CONFIGURATION
-const SUPABASE_URL = 'https://xmqmrkqyjnbupyalhnib.supabase.co';
+const SUPABASE_URL = '[https://xmqmrkqyjnbupyalhnib.supabase.co](https://xmqmrkqyjnbupyalhnib.supabase.co)';
 const SUPABASE_ANON_KEY = 'sb_publishable_7AqK322TINFq1y39lMgvTw_Z7Itc79G';
 
 // Initialize Supabase Client
@@ -16,6 +16,15 @@ if (window.mermaid) {
 let tasks = [];
 let currentFilter = 'all';
 
+function escapeHtml(str) {
+    return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 async function fetchTasks() {
     const { data: { session } } = await supabaseClient.auth.getSession();
     const container = document.getElementById('tasks-container');
@@ -24,7 +33,7 @@ async function fetchTasks() {
         tasks = [];
         if (container) {
             container.innerHTML = `
-                <div class="text-center py-12 bg-slate-900/30 rounded-2xl border border-white/5 space-y-3">
+                <div class="text-center py-12 bg-slate-900/30 rounded-2xl border border-white/5 space-y-3 bloom-subtle-card">
                     <p class="text-slate-400 text-sm">Please log in to view and manage your personal tasks.</p>
                     <button onclick="switchTab('auth')" class="px-4 py-2 rounded-xl bg-rose-500 text-white text-xs font-semibold hover:bg-rose-600 transition-colors">
                         Log In Now
@@ -69,12 +78,14 @@ async function handleAddTask(e) {
     if (!titleInput || !priorityInput || !categoryInput) return;
 
     const newTask = {
-        title: titleInput.value,
+        title: titleInput.value.trim(),
         priority: priorityInput.value,
         category: categoryInput.value,
         completed: false,
         user_id: session.user.id
     };
+
+    if (!newTask.title) return;
 
     const { error } = await supabaseClient
         .from('tasks')
@@ -141,9 +152,9 @@ async function fetchAiMicroSteps(taskTitle, elementId) {
     if (!container) return;
 
     container.innerHTML = `<p class="text-xs text-teal-400 animate-pulse mt-2 flex items-center gap-1.5"><i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Generating BloomAI Micro-Steps...</p>`;
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
 
-    const prompt = `Break down this task into 3 short, actionable, youth-friendly micro-steps to reduce overwhelm: "${taskTitle}". Return only the 3 numbered steps (1., 2., 3.) as plain text lines without markdown bolding.`;
+    const prompt = `Break down this task into 3 short, actionable, youth-friendly micro-steps to reduce overwhelm: "${taskTitle}". Return only the 3 numbered steps (1., 2., 3.) as plain text lines without markdown bolding or stray brackets.`;
 
     try {
         const { data, error } = await supabaseClient.functions.invoke('gemini-proxy', {
@@ -153,8 +164,11 @@ async function fetchAiMicroSteps(taskTitle, elementId) {
         if (error) throw error;
         if (data?.error) throw new Error(data.error.message || JSON.stringify(data.error));
 
-        const stepsText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "1. Review task details and requirements.\n2. Break it into smaller 10-minute blocks.\n3. Complete the very first small action.";
-        const escapedTitle = taskTitle.replace(/'/g, "\\'");
+        const rawSteps = data?.candidates?.[0]?.content?.parts?.[0]?.text
+            || data?.reply
+            || "1. Review task details and requirements.\n2. Break it into smaller 10-minute blocks.\n3. Complete the very first small action.";
+        const stepsText = cleanModelMarkdown(rawSteps);
+        const escapedTitle = String(taskTitle).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
         container.innerHTML = `
             <div class="mt-3 p-3.5 rounded-xl bg-slate-950/90 border border-teal-500/30 text-xs space-y-2 shadow-inner">
@@ -164,26 +178,27 @@ async function fetchAiMicroSteps(taskTitle, elementId) {
                             <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
                             BloomAI Micro-Steps (Do just the first 1):
                         </span>
-                        <span class="text-[10px] font-semibold bg-teal-500/15 text-teal-300 px-2 py-0.5 rounded border border-teal-500/30">Gemini AI</span>
+                        <span class="text-[10px] font-semibold bg-teal-500/15 text-teal-300 px-2 py-0.5 rounded border border-teal-500/30">Bloom AI</span>
                     </div>
                     <button onclick="fetchAiMicroSteps('${escapedTitle}', '${elementId}')" class="text-[11px] text-slate-400 hover:text-teal-300 flex items-center gap-1 transition-colors">
                         <i data-lucide="refresh-cw" class="w-3 h-3"></i>
                         <span>Regenerate with AI</span>
                     </button>
                 </div>
-                <div class="text-slate-200 <div class="bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 text-sm leading-relaxed whitespace-pre-line">
+                <div class="text-slate-200 leading-relaxed whitespace-pre-line">${escapeHtml(stepsText)}</div>
+            </div>
         `;
     } catch (err) {
         console.error("Micro-steps error:", err);
-        const escapedTitle = taskTitle.replace(/'/g, "\\'");
+        const escapedTitle = String(taskTitle).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
         container.innerHTML = `
             <div class="mt-2 flex items-center justify-between text-xs text-rose-400">
-                <span>AI Error: ${err.message}</span>
+                <span>AI Error: ${escapeHtml(err.message)}</span>
                 <button onclick="fetchAiMicroSteps('${escapedTitle}', '${elementId}')" class="underline hover:text-rose-300">Retry</button>
             </div>
         `;
     }
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
 }
 
 function renderTasks() {
@@ -205,7 +220,7 @@ function renderTasks() {
 
     if (filtered.length === 0) {
         container.innerHTML = `
-            <div class="text-center py-12 bg-slate-900/30 rounded-2xl border border-white/5">
+            <div class="text-center py-12 bg-slate-900/30 rounded-2xl border border-white/5 bloom-subtle-card">
                 <p class="text-slate-400 text-sm">No tasks found. Relax or add a new goal!</p>
             </div>
         `;
@@ -219,21 +234,21 @@ function renderTasks() {
     };
 
     container.innerHTML = filtered.map(t => {
-        const escapedTitle = t.title.replace(/'/g, "\\'");
+        const escapedTitle = String(t.title).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
         return `
-        <div class="p-4 rounded-2xl bg-slate-900/80 border ${t.completed ? 'border-slate-800 opacity-60' : 'border-white/10'} transition-all hover:border-white/20">
+        <div class="p-4 rounded-2xl bg-slate-900/80 border ${t.completed ? 'border-slate-800 opacity-60' : 'border-white/10'} transition-all hover:border-white/20 bloom-subtle-card">
             <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-3">
                     <button onclick="toggleTask(${t.id})" class="p-1 rounded-lg ${t.completed ? 'bg-rose-500 text-white' : 'border border-slate-600 hover:border-rose-400'}">
                         <i data-lucide="${t.completed ? 'check-square' : 'square'}" class="w-5 h-5"></i>
                     </button>
                     <div>
-                        <p class="text-sm font-semibold text-white ${t.completed ? 'line-through text-slate-500' : ''}">${t.title}</p>
-                        <span class="text-xs text-slate-400">${t.category}</span>
+                        <p class="text-sm font-semibold text-white ${t.completed ? 'line-through text-slate-500' : ''}">${escapeHtml(t.title)}</p>
+                        <span class="text-xs text-slate-400">${escapeHtml(t.category)}</span>
                     </div>
                 </div>
                 <div class="flex items-center space-x-3">
-                    ${priorityBadges[t.priority]}
+                    ${priorityBadges[t.priority] || priorityBadges.medium}
                     <button onclick="deleteTask(${t.id})" class="text-slate-500 hover:text-red-400 p-1">
                         <i data-lucide="trash-2" class="w-4 h-4"></i>
                     </button>
@@ -249,7 +264,7 @@ function renderTasks() {
         `;
     }).join('');
 
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
 }
 
 // POP CULTURE / MOVIE INSPIRATIONAL QUOTES (30s Rotation)
@@ -302,8 +317,10 @@ function switchTab(tabId) {
     const activeView = document.getElementById(`view-${tabId}`);
     const activeNav = document.getElementById(`nav-${tabId}`);
     const activeMNav = document.getElementById(`mnav-${tabId}`);
+    const mainEl = document.getElementById('main-content');
 
     if (activeView) activeView.classList.remove('hidden');
+    if (mainEl) mainEl.classList.toggle('bloom-chat-active', tabId === 'chat');
     if (activeNav) {
         activeNav.classList.add('bg-white/15', 'text-white');
         activeNav.classList.remove('text-slate-400');
@@ -313,7 +330,11 @@ function switchTab(tabId) {
         activeMNav.classList.remove('text-slate-400');
     }
 
-    lucide.createIcons();
+    if (tabId === 'tasks') fetchTasks();
+    if (tabId === 'learn') switchCategory('career');
+    if (tabId === 'chat') loadChatSessions();
+
+    if (window.lucide) lucide.createIcons();
 }
 
 // LEARNING PLATFORM DATA & SWITCHER
@@ -375,14 +396,14 @@ function switchCategory(cat) {
 
     const items = learningData[cat] || [];
     container.innerHTML = items.map(item => `
-        <div class="p-6 rounded-2xl bg-slate-900/80 border border-white/10 hover:border-rose-500/40 transition-all flex flex-col justify-between">
+        <div class="p-6 rounded-2xl bg-slate-900/80 border border-white/10 hover:border-rose-500/40 transition-all flex flex-col justify-between bloom-subtle-card">
             <div>
-                <span class="text-xs font-bold text-rose-400 uppercase tracking-wider">${item.type}</span>
-                <h3 class="text-lg font-bold text-white mt-2 mb-2">${item.title}</h3>
-                <p class="text-slate-400 text-sm leading-relaxed mb-4">${item.desc}</p>
+                <span class="text-xs font-bold text-rose-400 uppercase tracking-wider">${escapeHtml(item.type)}</span>
+                <h3 class="text-lg font-bold text-white mt-2 mb-2">${escapeHtml(item.title)}</h3>
+                <p class="text-slate-400 text-sm leading-relaxed mb-4">${escapeHtml(item.desc)}</p>
             </div>
-            <button onclick="alert('Opening resource guide...')" class="w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-semibold transition-colors">
-                Read Guide
+            <button onclick="switchTab('chat')" class="w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-semibold transition-colors">
+                Discuss with Bloom AI
             </button>
         </div>
     `).join('');
@@ -438,7 +459,7 @@ function getFileMimeType(file) {
 }
 
 async function handleFileSelection(e) {
-    const files = Array.from(e.target.files);
+    const files = Array.from(e.target.files || []);
     if (!files.length) return;
 
     for (const file of files) {
@@ -459,7 +480,7 @@ async function handleFileSelection(e) {
                     attachedFiles.push({
                         name: file.name,
                         type: mime,
-                        data: uploadEvent.target.result.split(',')[1]
+                        data: String(uploadEvent.target.result || '').split(',')[1] || ''
                     });
                     renderAttachmentsPreview();
                     resolve();
@@ -468,6 +489,7 @@ async function handleFileSelection(e) {
             });
         }
     }
+    e.target.value = '';
 }
 
 function renderAttachmentsPreview() {
@@ -484,13 +506,13 @@ function renderAttachmentsPreview() {
     previewContainer.innerHTML = attachedFiles.map((f, index) => `
         <div class="flex items-center gap-2 bg-slate-950 border border-rose-500/30 px-3 py-1.5 rounded-xl text-xs text-slate-200">
             <i data-lucide="${f.type.startsWith('image/') ? 'image' : 'file-text'}" class="w-3.5 h-3.5 text-rose-400"></i>
-            <span class="truncate max-w-[140px]">${f.name}</span>
+            <span class="truncate max-w-[140px]">${escapeHtml(f.name)}</span>
             <button type="button" onclick="removeAttachment(${index})" class="text-slate-500 hover:text-rose-400 ml-1">
                 <i data-lucide="x" class="w-3 h-3"></i>
             </button>
         </div>
     `).join('');
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
 }
 
 function removeAttachment(index) {
@@ -558,9 +580,38 @@ function stopVoiceUI() {
     if (input) input.placeholder = "Ask Bloom anything...";
 }
 
+// Clean stray model bracket/asterisk artifacts outside code fences & tables
+function cleanModelMarkdown(rawText) {
+    let text = String(rawText ?? '').trim();
+    if (!text) return '';
+
+    const codeFences = [];
+    text = text.replace(/```[\s\S]*?```/g, (block) => {
+        const token = `@@CODE_FENCE_${codeFences.length}@@`;
+        codeFences.push(block);
+        return token;
+    });
+
+    // Remove empty [] tokens or standalone broken bracket pairs
+    text = text.replace(/\[\s*\]/g, '');
+    // Collapse 3+ consecutive asterisks outside emphasis runs into a clean bullet or divider
+    text = text.replace(/\*{4,}/g, '**');
+    // Clean orphaned leading/trailing asterisks attached to plain words like ***word***
+    text = text.replace(/(?<!\*)\*\*\*([^\n*]+?)\*\*\*(?!\*)/g, '**$1**');
+
+    codeFences.forEach((block, idx) => {
+        text = text.replace(`@@CODE_FENCE_${idx}@@`, block);
+    });
+
+    return text.trim();
+}
+
 function formatAiMessageContent(rawText) {
+    const cleaned = cleanModelMarkdown(rawText);
+    if (!cleaned) return '<p>No response returned.</p>';
+
     const mermaidBlocks = [];
-    let processedText = String(rawText || '').replace(/```mermaid\s*([\s\S]*?)```/g, (match, code) => {
+    let processedText = cleaned.replace(/```mermaid\s*([\s\S]*?)```/g, (match, code) => {
         const placeholder = `%%MERMAID_BLOCK_${mermaidBlocks.length}%%`;
         mermaidBlocks.push(`
             <div class="my-3 p-4 rounded-2xl bg-slate-950 border border-rose-500/30 overflow-x-auto shadow-inner">
@@ -568,7 +619,7 @@ function formatAiMessageContent(rawText) {
                     <i data-lucide="git-branch" class="w-3.5 h-3.5"></i>
                     <span>Bloom Visual Roadmap</span>
                 </div>
-                <div class="mermaid flex justify-center">${code.trim()}</div>
+                <div class="mermaid flex justify-center">${escapeHtml(code.trim())}</div>
             </div>
         `);
         return placeholder;
@@ -578,9 +629,9 @@ function formatAiMessageContent(rawText) {
     try {
         html = window.marked
             ? marked.parse(processedText, { breaks: true, gfm: true })
-            : processedText.replace(/\n/g, '<br>');
+            : escapeHtml(processedText).replace(/\n/g, '<br>');
     } catch {
-        html = processedText.replace(/\n/g, '<br>');
+        html = escapeHtml(processedText).replace(/\n/g, '<br>');
     }
 
     html = html
@@ -602,6 +653,7 @@ function formatAiMessageContent(rawText) {
 
     return html;
 }
+
 async function renderDiagramsInChat() {
     if (window.mermaid) {
         try {
@@ -615,6 +667,7 @@ async function renderDiagramsInChat() {
 // --- EXPLORE BLOOM AI MULTI-CHAT SYSTEM ---
 let currentSessionId = null;
 let chatSessions = [];
+let isSendingMessage = false;
 
 async function loadChatSessions() {
     const { data: { session } } = await supabaseClient.auth.getSession();
@@ -671,13 +724,13 @@ function renderChatSessionsList() {
 
     listContainer.innerHTML = chatSessions.map(s => `
         <div onclick="selectChatSession('${s.id}')" class="group flex items-center justify-between p-2.5 rounded-xl text-xs font-medium cursor-pointer transition-all ${s.id === currentSessionId ? 'bg-rose-500/20 border border-rose-500/40 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'}">
-            <span class="truncate max-w-[160px]">${s.title}</span>
+            <span class="truncate max-w-[160px]">${escapeHtml(s.title)}</span>
             <button onclick="deleteChatSession(event, '${s.id}')" class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-rose-400 p-1 transition-opacity" title="Delete chat">
                 <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
             </button>
         </div>
     `).join('');
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
 }
 
 async function createNewChatSession() {
@@ -731,7 +784,7 @@ async function selectChatSession(sessionId) {
                 <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
                     <i data-lucide="flower-2" class="w-4 h-4"></i>
                 </div>
-                <div class="bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 text-sm leading-relaxed">
+                <div class="bloom-chat-bubble-ai bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 text-sm leading-relaxed">
                     Hey there. 👋 I’m Bloom. Ask me anything, upload an image or file, or ask me to create a visual roadmap!
                 </div>
             </div>
@@ -741,8 +794,8 @@ async function selectChatSession(sessionId) {
             if (m.role === 'user') {
                 return `
                     <div class="flex items-start justify-end space-x-3">
-                        <div class="bg-rose-600 text-white p-4 rounded-2xl rounded-tr-none max-w-[85%] text-sm leading-relaxed shadow-md">
-                            ${m.content}
+                        <div class="bg-rose-600 text-white p-4 rounded-2xl rounded-tr-none max-w-[85%] text-sm leading-relaxed shadow-md whitespace-pre-wrap">
+                            ${escapeHtml(m.content)}
                         </div>
                     </div>
                 `;
@@ -752,7 +805,8 @@ async function selectChatSession(sessionId) {
                         <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
                             <i data-lucide="flower-2" class="w-4 h-4"></i>
                         </div>
-<div class="bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 text-sm leading-relaxed whitespace-pre-line">                            ${formatAiMessageContent(m.content)}
+                        <div class="bloom-chat-bubble-ai bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 text-sm leading-relaxed">
+                            ${formatAiMessageContent(m.content)}
                         </div>
                     </div>
                 `;
@@ -760,7 +814,7 @@ async function selectChatSession(sessionId) {
         }).join('');
     }
     chatContainer.scrollTop = chatContainer.scrollHeight;
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
     await renderDiagramsInChat();
 }
 
@@ -792,12 +846,16 @@ async function deleteChatSession(event, sessionId) {
 }
 
 function sendQuickPrompt(promptText) {
-    document.getElementById('chat-input').value = promptText;
+    const input = document.getElementById('chat-input');
+    if (!input) return;
+    input.value = promptText;
     handleSendMessage(new Event('submit'));
 }
 
 async function handleSendMessage(e) {
     if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    if (isSendingMessage) return;
+
     const input = document.getElementById('chat-input');
     const text = input ? input.value.trim() : '';
     if (!text && attachedFiles.length === 0) return;
@@ -814,357 +872,299 @@ async function handleSendMessage(e) {
     }
 
     const chatContainer = document.getElementById('chat-messages');
-    const attachedNames = attachedFiles.map(f => f.name).join(', ');
+    const filesSnapshot = [...attachedFiles];
+    const attachedNames = filesSnapshot.map(f => f.name).join(', ');
     const displayPrompt = text
         ? (attachedNames ? `${text} [Attached: ${attachedNames}]` : text)
         : `[Attached: ${attachedNames}]`;
 
-    // Render user message immediately on screen
-    chatContainer.insertAdjacentHTML('beforeend', `
-        <div class="flex items-start justify-end space-x-3">
-            <div class="bg-rose-600 text-white p-4 rounded-2xl rounded-tr-none max-w-[85%] text-sm leading-relaxed shadow-md">
-                ${displayPrompt}
-            </div>
-        </div>
-    `);
     if (input) input.value = '';
-    chatContainer.scrollTop = chatContainer.scrollHeight;
+    attachedFiles = [];
+    renderAttachmentsPreview();
+    isSendingMessage = true;
 
-    // Save user message in background
-    if (currentSessionId) {
-        supabaseClient.from('chat_messages').insert([{
+    if (chatContainer) {
+        chatContainer.insertAdjacentHTML('beforeend', `
+            <div class="flex items-start justify-end space-x-3">
+                <div class="bg-rose-600 text-white p-4 rounded-2xl rounded-tr-none max-w-[85%] text-sm leading-relaxed shadow-md whitespace-pre-wrap">
+                    ${escapeHtml(displayPrompt)}
+                </div>
+            </div>
+        `);
+
+        chatContainer.insertAdjacentHTML('beforeend', `
+            <div id="bloom-typing-row" class="flex items-start space-x-3">
+                <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
+                    <i data-lucide="flower-2" class="w-4 h-4"></i>
+                </div>
+                <div class="bloom-chat-bubble-ai bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none text-slate-400 text-sm animate-pulse">
+                    Bloom is thinking...
+                </div>
+            </div>
+        `);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+        if (window.lucide) lucide.createIcons();
+    }
+
+    try {
+        await supabaseClient.from('chat_messages').insert([{
             session_id: currentSessionId,
             user_id: session.user.id,
             role: 'user',
             content: displayPrompt
-        }]).then(({ error }) => {
-            if (error) console.warn("DB save user msg warning:", error.message);
-        });
-    }
+        }]);
 
-    const typingId = 'typing-' + Date.now();
-    chatContainer.insertAdjacentHTML('beforeend', `
-        <div id="${typingId}" class="flex items-start space-x-3">
-            <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
-                <i data-lucide="flower-2" class="w-4 h-4 animate-spin"></i>
-            </div>
-            <div class="bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none text-slate-400 text-sm">
-                Bloom is thinking...
-            </div>
-        </div>
-    `);
-    chatContainer.scrollTop = chatContainer.scrollHeight;
-    lucide.createIcons();
-
-    try {
-        const fastInstruction = `You are Bloom, an empathetic, practical AI mentor for teenagers and young adults navigating school, work, personal growth, and mental health. Give clear, helpful, well-structured answers with actionable next steps. If the user uploads an image or file, analyze it thoroughly. If asked for a roadmap or flowchart, include a clean \`\`\`mermaid diagram.
-
-User prompt: ${text || "Please analyze the attached file(s)."}`;
-
-        let invokeBody = { prompt: fastInstruction };
-        if (attachedFiles.length > 0) {
-            invokeBody.files = attachedFiles.map(f => ({
-                name: f.name,
-                mimeType: f.type,
-                data: f.data
-            }));
+        const activeSession = chatSessions.find(s => s.id === currentSessionId);
+        if (activeSession && activeSession.title === 'New Conversation' && text) {
+            const shortTitle = text.slice(0, 36);
+            await supabaseClient
+                .from('chat_sessions')
+                .update({ title: shortTitle })
+                .eq('id', currentSessionId);
+            activeSession.title = shortTitle;
+            const titleEl = document.getElementById('active-chat-title');
+            if (titleEl) titleEl.innerText = shortTitle;
+            renderChatSessionsList();
         }
 
         const { data, error } = await supabaseClient.functions.invoke('gemini-proxy', {
-            body: invokeBody
+            body: {
+                prompt: text || 'Analyze the attached file(s).',
+                files: filesSnapshot
+            }
         });
 
-        attachedFiles = [];
-        renderAttachmentsPreview();
-        const fileInput = document.getElementById('chat-file-input');
-        if (fileInput) fileInput.value = '';
-
-        document.getElementById(typingId)?.remove();
         if (error) throw error;
         if (data?.error) throw new Error(data.error.message || JSON.stringify(data.error));
 
-        const aiReply = data?.candidates?.[0]?.content?.parts?.[0]?.text || data?.reply || "I'm right here with you. Let's explore this together step by step.";
+        const rawReply =
+            data?.candidates?.[0]?.content?.parts?.[0]?.text
+            || data?.reply
+            || "I didn't receive a text response—please try again.";
+        const formattedHtml = formatAiMessageContent(rawReply);
 
-        if (currentSessionId) {
-            supabaseClient.from('chat_messages').insert([{
-                session_id: currentSessionId,
-                user_id: session.user.id,
-                role: 'assistant',
-                content: aiReply
-            }]).then(({ error: dbErr }) => {
-                if (dbErr) console.warn("DB save AI msg warning:", dbErr.message);
-            });
+        document.getElementById('bloom-typing-row')?.remove();
+
+        if (chatContainer) {
+            chatContainer.insertAdjacentHTML('beforeend', `
+                <div class="flex items-start space-x-3">
+                    <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
+                        <i data-lucide="flower-2" class="w-4 h-4"></i>
+                    </div>
+                    <div class="bloom-chat-bubble-ai bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 text-sm leading-relaxed">
+                        ${formattedHtml}
+                    </div>
+                </div>
+            `);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            if (window.lucide) lucide.createIcons();
+            await renderDiagramsInChat();
         }
 
-        const activeSession = chatSessions.find(s => s.id === currentSessionId);
-        if (activeSession && activeSession.title === 'New Conversation') {
-            const shortTitle = displayPrompt.length > 28 ? displayPrompt.substring(0, 28) + '...' : displayPrompt;
-            supabaseClient.from('chat_sessions').update({ title: shortTitle }).eq('id', currentSessionId).then(() => {
-                activeSession.title = shortTitle;
-                renderChatSessionsList();
-                const titleEl = document.getElementById('active-chat-title');
-                if (titleEl) titleEl.innerText = shortTitle;
-            });
-        }
-
-        chatContainer.insertAdjacentHTML('beforeend', `
-            <div class="flex items-start space-x-3">
-                <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
-                    <i data-lucide="flower-2" class="w-4 h-4"></i>
-                </div>
-                <div class="bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 text-sm leading-relaxed whitespace-pre-line">
-                    ${formatAiMessageContent(aiReply)}
-                </div>
-            </div>
-        `);
+        await supabaseClient.from('chat_messages').insert([{
+            session_id: currentSessionId,
+            user_id: session.user.id,
+            role: 'assistant',
+            content: rawReply
+        }]);
     } catch (err) {
-        document.getElementById(typingId)?.remove();
-        console.error("AI Chat Error:", err);
-        chatContainer.insertAdjacentHTML('beforeend', `
-            <div class="flex items-start space-x-3">
-                <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
-                    <i data-lucide="alert-circle" class="w-4 h-4"></i>
+        console.error("Chat error:", err);
+        document.getElementById('bloom-typing-row')?.remove();
+        if (chatContainer) {
+            chatContainer.insertAdjacentHTML('beforeend', `
+                <div class="flex items-start space-x-3">
+                    <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
+                        <i data-lucide="alert-circle" class="w-4 h-4"></i>
+                    </div>
+                    <div class="bloom-chat-bubble-ai bg-slate-800/80 border border-rose-500/30 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-rose-300 text-sm">
+                        Couldn't complete that request: ${escapeHtml(err.message)}
+                    </div>
                 </div>
-                <div class="bg-slate-800/80 border border-rose-500/30 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-rose-200 text-sm leading-relaxed">
-                    Connection error: ${err.message}
-                </div>
-            </div>
-        `);
+            `);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            if (window.lucide) lucide.createIcons();
+        }
+    } finally {
+        isSendingMessage = false;
     }
-
-    chatContainer.scrollTop = chatContainer.scrollHeight;
-    lucide.createIcons();
-    await renderDiagramsInChat();
 }
 
-// --- SUPABASE AUTHENTICATION & PASSWORD RECOVERY LOGIC ---
+// --- AUTHENTICATION ---
 let isSignUpMode = false;
 
 function toggleAuthMode() {
     isSignUpMode = !isSignUpMode;
-    document.getElementById('auth-title').innerText = isSignUpMode ? 'Create Account' : 'Welcome Back';
-    document.getElementById('auth-subtitle').innerText = isSignUpMode
-        ? 'Join Bloom to organize your focus and peace of mind.'
+    const titleEl = document.getElementById('auth-title');
+    const subtitleEl = document.getElementById('auth-subtitle');
+    const submitBtn = document.getElementById('auth-submit-btn');
+    const toggleBtn = document.getElementById('auth-toggle-btn');
+
+    if (titleEl) titleEl.innerText = isSignUpMode ? 'Create Your Account' : 'Welcome Back';
+    if (subtitleEl) subtitleEl.innerText = isSignUpMode
+        ? 'Sign up to save tasks and Bloom AI chats.'
         : 'Sign in to sync your tasks and Bloom AI chats.';
-    document.getElementById('auth-submit-btn').innerText = isSignUpMode ? 'Sign Up' : 'Sign In';
-    document.getElementById('auth-toggle-btn').innerHTML = isSignUpMode
-        ? 'Already have an account? <span class="font-bold text-white">Sign In</span>'
-        : "Don't have an account? <span class=\"font-bold text-white\">Sign Up</span>";
-
-    const forgotLink = document.getElementById('forgot-pwd-link');
-    if (forgotLink) forgotLink.style.display = isSignUpMode ? 'none' : 'inline-block';
-
-    document.getElementById('auth-error').classList.add('hidden');
-    document.getElementById('auth-success')?.classList.add('hidden');
-}
-
-async function handleForgotPassword() {
-    const emailInput = document.getElementById('auth-email');
-    const errorBox = document.getElementById('auth-error');
-    const successBox = document.getElementById('auth-success');
-
-    errorBox.classList.add('hidden');
-    if (successBox) successBox.classList.add('hidden');
-
-    const email = emailInput.value.trim();
-    if (!email) {
-        errorBox.innerText = 'Please type your email address in the box above first, then click "Forgot password?".';
-        errorBox.classList.remove('hidden');
-        emailInput.focus();
-        return;
-    }
-
-    try {
-        const redirectUrl = window.location.origin + window.location.pathname;
-        const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
-            redirectTo: redirectUrl
-        });
-
-        if (error) throw error;
-
-        if (successBox) {
-            successBox.innerText = 'Password reset link sent! Check your email inbox (and spam folder).';
-            successBox.classList.remove('hidden');
-        }
-    } catch (err) {
-        errorBox.innerText = err.message;
-        errorBox.classList.remove('hidden');
-    }
-}
-
-async function handleUpdatePassword(e) {
-    e.preventDefault();
-    const newPassword = document.getElementById('new-password').value;
-    const errorBox = document.getElementById('reset-error');
-    const submitBtn = document.getElementById('reset-submit-btn');
-
-    errorBox.classList.add('hidden');
-    submitBtn.disabled = true;
-    submitBtn.innerText = 'Updating...';
-
-    try {
-        const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
-        if (error) throw error;
-
-        document.getElementById('reset-password-form').classList.add('hidden');
-        document.getElementById('auth-form').classList.remove('hidden');
-        document.getElementById('auth-footer-toggle').classList.remove('hidden');
-        switchTab('tasks');
-    } catch (err) {
-        errorBox.innerText = err.message;
-        errorBox.classList.remove('hidden');
-    } finally {
-        submitBtn.disabled = false;
-        submitBtn.innerText = 'Save New Password';
+    if (submitBtn) submitBtn.innerText = isSignUpMode ? 'Create Account' : 'Sign In';
+    if (toggleBtn) {
+        toggleBtn.innerHTML = isSignUpMode
+            ? 'Already have an account? <span class="font-bold text-white">Sign In</span>'
+            : "Don't have an account? <span class=\"font-bold text-white\">Sign Up</span>";
     }
 }
 
 async function handleAuthSubmit(e) {
     e.preventDefault();
-    const email = document.getElementById('auth-email').value;
-    const password = document.getElementById('auth-password').value;
-    const errorBox = document.getElementById('auth-error');
-    const successBox = document.getElementById('auth-success');
-    const submitBtn = document.getElementById('auth-submit-btn');
+    const email = document.getElementById('auth-email')?.value.trim();
+    const password = document.getElementById('auth-password')?.value;
+    const errEl = document.getElementById('auth-error');
+    const okEl = document.getElementById('auth-success');
 
-    errorBox.classList.add('hidden');
-    if (successBox) successBox.classList.add('hidden');
-    submitBtn.disabled = true;
-    submitBtn.innerText = 'Processing...';
+    if (errEl) errEl.classList.add('hidden');
+    if (okEl) okEl.classList.add('hidden');
 
-    try {
-        let result;
-        if (isSignUpMode) {
-            result = await supabaseClient.auth.signUp({ email, password });
-        } else {
-            result = await supabaseClient.auth.signInWithPassword({ email, password });
+    const res = isSignUpMode
+        ? await supabaseClient.auth.signUp({ email, password })
+        : await supabaseClient.auth.signInWithPassword({ email, password });
+
+    if (res.error) {
+        if (errEl) {
+            errEl.textContent = res.error.message;
+            errEl.classList.remove('hidden');
         }
-
-        if (result.error) throw result.error;
-
-        updateAuthUI(result.data.user);
-        switchTab('tasks');
-    } catch (err) {
-        errorBox.innerText = err.message;
-        errorBox.classList.remove('hidden');
-    } finally {
-        submitBtn.disabled = false;
-        submitBtn.innerText = isSignUpMode ? 'Sign Up' : 'Sign In';
+        return;
     }
-}
 
-async function handleLogout() {
-    await supabaseClient.auth.signOut();
-    updateAuthUI(null);
+    if (isSignUpMode && !res.data.session) {
+        if (okEl) {
+            okEl.textContent = 'Check your email to confirm your account, then sign in.';
+            okEl.classList.remove('hidden');
+        }
+        return;
+    }
+
     switchTab('home');
 }
 
-function updateAuthUI(user) {
-    const authBtn = document.getElementById('auth-nav-btn');
-    if (!authBtn) return;
+async function handleForgotPassword() {
+    const email = document.getElementById('auth-email')?.value.trim();
+    const errEl = document.getElementById('auth-error');
+    const okEl = document.getElementById('auth-success');
 
-    if (user) {
-        authBtn.innerHTML = '<i data-lucide="log-out" class="w-4 h-4"></i><span>Log Out</span>';
-        authBtn.onclick = handleLogout;
-        authBtn.classList.add('border-rose-500/40', 'text-rose-300');
-    } else {
-        authBtn.innerHTML = '<i data-lucide="log-in" class="w-4 h-4"></i><span>Log In</span>';
-        authBtn.onclick = () => switchTab('auth');
-        authBtn.classList.remove('border-rose-500/40', 'text-rose-300');
+    if (!email) {
+        if (errEl) {
+            errEl.textContent = 'Enter your email address first.';
+            errEl.classList.remove('hidden');
+        }
+        return;
     }
-    lucide.createIcons();
+
+    const { error } = await supabaseClient.auth.resetPasswordForEmail(email);
+    if (error && errEl) {
+        errEl.textContent = error.message;
+        errEl.classList.remove('hidden');
+    } else if (okEl) {
+        okEl.textContent = 'Password reset link sent to your email.';
+        okEl.classList.remove('hidden');
+    }
 }
 
-// --- AD-FREE BACKGROUND FOCUS MUSIC PLAYER ---
-let isMusicPlaying = false;
+async function handleUpdatePassword(e) {
+    e.preventDefault();
+    const password = document.getElementById('new-password')?.value;
+    const errEl = document.getElementById('reset-error');
+    const { error } = await supabaseClient.auth.updateUser({ password });
+    if (error && errEl) {
+        errEl.textContent = error.message;
+        errEl.classList.remove('hidden');
+    } else {
+        document.getElementById('reset-password-form')?.classList.add('hidden');
+        document.getElementById('auth-form')?.classList.remove('hidden');
+        switchTab('home');
+    }
+}
+
+async function syncAuthButton() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const btn = document.getElementById('auth-nav-btn');
+    if (!btn) return;
+
+    if (session) {
+        btn.innerHTML = `<i data-lucide="log-out" class="w-4 h-4"></i><span>Log Out</span>`;
+        btn.onclick = async () => {
+            await supabaseClient.auth.signOut();
+            switchTab('home');
+        };
+    } else {
+        btn.innerHTML = `<i data-lucide="log-in" class="w-4 h-4"></i><span>Log In</span>`;
+        btn.onclick = () => switchTab('auth');
+    }
+    if (window.lucide) lucide.createIcons();
+}
+
+// --- FOCUS RADIO ---
+let isPlayingMusic = false;
 
 function toggleMusic() {
     const audio = document.getElementById('bg-audio');
     const icon = document.getElementById('music-icon');
-    if (!audio || !icon) return;
+    if (!audio) return;
 
-    if (isMusicPlaying) {
+    if (isPlayingMusic) {
         audio.pause();
-        isMusicPlaying = false;
-        icon.setAttribute('data-lucide', 'play');
+        isPlayingMusic = false;
+        if (icon) icon.setAttribute('data-lucide', 'play');
     } else {
-        audio.volume = document.getElementById('music-volume')?.value || 0.4;
         audio.play().then(() => {
-            isMusicPlaying = true;
-            icon.setAttribute('data-lucide', 'pause');
-            lucide.createIcons();
-        }).catch(err => {
-            console.error("Audio playback error:", err);
-            alert("Stream is buffering or temporarily unavailable. Try switching stations!");
-        });
+            isPlayingMusic = true;
+            if (icon) icon.setAttribute('data-lucide', 'pause');
+            if (window.lucide) lucide.createIcons();
+        }).catch(err => console.warn('Audio play blocked/error:', err));
     }
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
 }
 
 function changeStation() {
+    const select = document.getElementById('music-station');
     const audio = document.getElementById('bg-audio');
     const source = document.getElementById('bg-audio-source');
-    const stationSelect = document.getElementById('music-station');
-    if (!audio || !source || !stationSelect) return;
+    if (!select || !audio || !source) return;
 
-    source.src = stationSelect.value;
+    source.src = select.value;
     audio.load();
-
-    if (isMusicPlaying) {
-        audio.play().catch(err => {
-            console.error("Stream switch error:", err);
-            isMusicPlaying = false;
-            document.getElementById('music-icon')?.setAttribute('data-lucide', 'play');
-            lucide.createIcons();
-        });
+    if (isPlayingMusic) {
+        audio.play().catch(err => console.warn('Station switch error:', err));
     }
 }
 
 function setMusicVolume(val) {
     const audio = document.getElementById('bg-audio');
-    if (audio) audio.volume = val;
+    if (audio) audio.volume = parseFloat(val);
 }
 
 function handleAudioError() {
-    console.warn("Audio stream connection error encountered.");
-    isMusicPlaying = false;
+    isPlayingMusic = false;
     const icon = document.getElementById('music-icon');
-    if (icon) {
-        icon.setAttribute('data-lucide', 'play');
-        lucide.createIcons();
-    }
+    if (icon) icon.setAttribute('data-lucide', 'play');
+    if (window.lucide) lucide.createIcons();
 }
 
-// Listen for auth state changes (Login, Logout, Password Recovery)
-supabaseClient.auth.onAuthStateChange((event, session) => {
-    if (event === 'PASSWORD_RECOVERY') {
-        switchTab('auth');
-        document.getElementById('auth-title').innerText = 'Reset Your Password';
-        document.getElementById('auth-subtitle').innerText = 'Enter a new password for your Bloom account.';
-        document.getElementById('auth-form').classList.add('hidden');
-        document.getElementById('auth-footer-toggle').classList.add('hidden');
-        document.getElementById('reset-password-form').classList.remove('hidden');
-    } else {
-        updateAuthUI(session?.user || null);
-        fetchTasks();
-        loadChatSessions();
-    }
-});
-
-// INITIALIZATION ON DOM LOAD
-document.addEventListener('DOMContentLoaded', () => {
-    console.log("Bloom application initialized.");
-    lucide.createIcons();
-    fetchTasks();
-    loadChatSessions();
-    switchCategory('career');
-
+// --- INITIALIZATION ---
+document.addEventListener('DOMContentLoaded', async () => {
     const taskForm = document.getElementById('task-form');
-    if (taskForm) {
-        taskForm.addEventListener('submit', handleAddTask);
-    }
+    if (taskForm) taskForm.addEventListener('submit', handleAddTask);
 
-    supabaseClient.auth.getSession().then(({ data: { session } }) => {
-        updateAuthUI(session?.user || null);
+    const volInput = document.getElementById('music-volume');
+    const audio = document.getElementById('bg-audio');
+    if (volInput && audio) audio.volume = parseFloat(volInput.value);
+
+    supabaseClient.auth.onAuthStateChange((event) => {
+        syncAuthButton();
+        if (event === 'PASSWORD_RECOVERY') {
+            switchTab('auth');
+            document.getElementById('auth-form')?.classList.add('hidden');
+            document.getElementById('reset-password-form')?.classList.remove('hidden');
+        }
     });
+
+    await syncAuthButton();
+    if (window.lucide) lucide.createIcons();
 });

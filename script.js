@@ -1,13 +1,8 @@
-// BLOOM APPLICATION SCRIPT (2026 EDITION - SUPABASE, GEMINI AI, GUIDANCE DETAIL, MULTIMODAL, MULTI-CHAT, FOCUS RADIO & GOOGLE CALENDAR SYNC)
+// BLOOM APPLICATION SCRIPT (2026 EDITION - SUPABASE, GEMINI AI, GUIDANCE DETAIL, MULTIMODAL, MULTI-CHAT & FOCUS RADIO)
 
 // SUPABASE CONFIGURATION
 const SUPABASE_URL = 'https://xmqmrkqyjnbupyalhnib.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_7AqK322TINFq1y39lMgvTw_Z7Itc79G';
-
-// GOOGLE CALENDAR OAUTH 2.0 CONFIGURATION (Replace with your Web Client ID from Google Cloud Console)
-const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com';
-const GOOGLE_CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
-let googleAccessToken = null;
 
 // Initialize Supabase Client
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -28,22 +23,6 @@ function escapeHtml(str) {
 
 function escapeJsSingleQuote(str) {
     return String(str ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-}
-
-function updateCalendarSyncStatus(label, tone = 'idle') {
-    const statusEl = document.getElementById('gcal-sync-status');
-    if (!statusEl) return;
-
-    statusEl.textContent = label;
-    statusEl.className = 'text-xs px-2.5 py-1 rounded-full border transition-colors ';
-
-    if (tone === 'connected') {
-        statusEl.className += 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300';
-    } else if (tone === 'error') {
-        statusEl.className += 'bg-rose-500/15 border-rose-500/40 text-rose-300';
-    } else {
-        statusEl.className += 'bg-slate-900/80 border-white/10 text-slate-400';
-    }
 }
 
 // --- TASK MANAGEMENT WITH SUPABASE (PER-USER ISOLATED) ---
@@ -99,21 +78,11 @@ async function handleAddTask(e) {
     const titleInput = document.getElementById('task-title');
     const priorityInput = document.getElementById('task-priority');
     const categoryInput = document.getElementById('task-category');
-    const scheduledInput = document.getElementById('task-scheduled-time');
-    const durationInput = document.getElementById('task-duration');
-    const autoSyncInput = document.getElementById('task-auto-gcal');
 
     if (!titleInput || !priorityInput || !categoryInput) return;
 
     const cleanTitle = titleInput.value.trim();
     if (!cleanTitle) return;
-
-    const scheduledIso = scheduledInput && scheduledInput.value
-        ? new Date(scheduledInput.value).toISOString()
-        : null;
-    const durationMins = durationInput && Number(durationInput.value) > 0
-        ? Number(durationInput.value)
-        : 45;
 
     const newTask = {
         title: cleanTitle,
@@ -123,10 +92,9 @@ async function handleAddTask(e) {
         user_id: session.user.id
     };
 
-    const { data: insertedRows, error } = await supabaseClient
+    const { error } = await supabaseClient
         .from('tasks')
-        .insert([newTask])
-        .select();
+        .insert([newTask]);
 
     if (error) {
         console.error("Supabase Error:", error.message);
@@ -135,18 +103,7 @@ async function handleAddTask(e) {
     }
 
     titleInput.value = '';
-    if (scheduledInput) scheduledInput.value = '';
-
-    await fetchTasks();
-
-    const createdTask = insertedRows?.[0] || tasks.find(t => t.title === cleanTitle);
-    if (createdTask) {
-        createdTask.scheduled_for = scheduledIso;
-        createdTask.duration_minutes = durationMins;
-        if (autoSyncInput && autoSyncInput.checked) {
-            await syncTaskToGoogleCalendar(createdTask.id, scheduledIso, durationMins);
-        }
-    }
+    fetchTasks();
 }
 
 async function toggleTask(id) {
@@ -192,198 +149,6 @@ function filterTasks(priority) {
     }
 
     renderTasks();
-}
-
-// --- GOOGLE CALENDAR OAUTH 2.0 + REST API & .ICS FALLBACK FOR FOCUS TASKS ---
-function getTaskTimeRange(task, overrideStartIso = null, overrideDurationMins = null) {
-    const scheduledInput = document.getElementById('task-scheduled-time');
-    const durationInput = document.getElementById('task-duration');
-
-    let start = new Date();
-    const rawStart = overrideStartIso || task?.scheduled_for || (scheduledInput && scheduledInput.value);
-
-    if (rawStart) {
-        const parsed = new Date(rawStart);
-        if (!Number.isNaN(parsed.getTime())) {
-            start = parsed;
-        } else {
-            start.setMinutes(0, 0, 0);
-            start.setHours(start.getHours() + 1);
-        }
-    } else {
-        start.setMinutes(0, 0, 0);
-        start.setHours(start.getHours() + 1);
-    }
-
-    const mins = Number(
-        overrideDurationMins ||
-        task?.duration_minutes ||
-        (durationInput && durationInput.value) ||
-        45
-    ) || 45;
-
-    const end = new Date(start.getTime() + mins * 60 * 1000);
-    return { start, end, durationMins: mins };
-}
-
-function requestGoogleCalendarToken() {
-    return new Promise((resolve, reject) => {
-        if (!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.startsWith('YOUR_GOOGLE_OAUTH_CLIENT_ID')) {
-            reject(new Error('Set your GOOGLE_CLIENT_ID in script.js first.'));
-            return;
-        }
-        if (!window.google?.accounts?.oauth2) {
-            reject(new Error('Google Identity Services script is still loading. Please try again.'));
-            return;
-        }
-
-        const tokenClient = window.google.accounts.oauth2.initTokenClient({
-            client_id: GOOGLE_CLIENT_ID,
-            scope: GOOGLE_CALENDAR_SCOPE,
-            callback: (resp) => {
-                if (resp.error) {
-                    reject(new Error(resp.error_description || resp.error));
-                    return;
-                }
-                googleAccessToken = resp.access_token;
-                updateCalendarSyncStatus('Calendar: Connected', 'connected');
-                resolve(googleAccessToken);
-            }
-        });
-
-        tokenClient.requestAccessToken({ prompt: googleAccessToken ? '' : 'consent' });
-    });
-}
-
-async function syncTaskToGoogleCalendar(id, overrideStartIso = null, overrideDurationMins = null) {
-    const task = tasks.find(t => String(t.id) === String(id));
-    if (!task) return;
-
-    const statusBox = document.getElementById(`gcal-status-${id}`);
-
-    try {
-        updateCalendarSyncStatus('Calendar: Syncing...', 'idle');
-        if (statusBox) {
-            statusBox.innerHTML = `<span class="text-[11px] text-sky-300 animate-pulse">Syncing to Google Calendar...</span>`;
-        }
-
-        const token = googleAccessToken || (await requestGoogleCalendarToken());
-        const { start, end, durationMins } = getTaskTimeRange(task, overrideStartIso, overrideDurationMins);
-        const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-
-        const eventPayload = {
-            summary: `Bloom Focus: ${task.title}`,
-            description: `Category: ${task.category || 'Focus'} | Priority: ${(task.priority || 'medium').toUpperCase()} | Duration: ${durationMins} mins`,
-            start: {
-                dateTime: start.toISOString(),
-                timeZone
-            },
-            end: {
-                dateTime: end.toISOString(),
-                timeZone
-            }
-        };
-
-        const response = await fetch(
-            'https://www.googleapis.com/calendar/v3/calendars/primary/events',
-            {
-                method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(eventPayload)
-            }
-        );
-
-        if (response.status === 401) {
-            googleAccessToken = null;
-            return syncTaskToGoogleCalendar(id, overrideStartIso, overrideDurationMins);
-        }
-
-        if (!response.ok) {
-            const errData = await response.json().catch(() => ({}));
-            throw new Error(errData.error?.message || `Calendar API error (${response.status})`);
-        }
-
-        const createdEvent = await response.json();
-        task.syncedToGoogleCalendar = true;
-        task.googleEventLink = createdEvent.htmlLink || '';
-        updateCalendarSyncStatus('Calendar: Synced', 'connected');
-
-        if (statusBox) {
-            statusBox.innerHTML = `
-                <div class="flex items-center justify-between gap-2 text-[11px] text-emerald-300">
-                    <span>Synced to Google Calendar (${start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })})</span>
-                    ${
-                        createdEvent.htmlLink
-                            ? `<a href="${escapeHtml(createdEvent.htmlLink)}" target="_blank" rel="noopener noreferrer" class="underline hover:text-emerald-200">Open Event</a>`
-                            : ''
-                    }
-                </div>
-            `;
-        }
-    } catch (err) {
-        console.error('Google Calendar sync failed:', err);
-        updateCalendarSyncStatus('Calendar: Check setup/auth', 'error');
-        if (statusBox) {
-            statusBox.innerHTML = `
-                <div class="flex items-center justify-between gap-2 text-[11px] text-rose-300">
-                    <span>Sync issue: ${escapeHtml(err.message)}</span>
-                    <button type="button" onclick="downloadTaskIcs('${escapeJsSingleQuote(String(id))}')" class="underline hover:text-rose-200">Use .ics instead</button>
-                </div>
-            `;
-        } else {
-            alert(`Google Calendar sync failed: ${err.message}`);
-        }
-    }
-}
-
-function downloadTaskIcs(id) {
-    const task = tasks.find(t => String(t.id) === String(id));
-    if (!task) return;
-
-    const { start, end, durationMins } = getTaskTimeRange(task);
-    const fmtUtc = d => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
-    const cleanIcs = text =>
-        String(text ?? '')
-            .replace(/\\/g, '\\\\')
-            .replace(/;/g, '\\;')
-            .replace(/,/g, '\\,')
-            .replace(/\n/g, '\\n');
-
-    const icsLines = [
-        'BEGIN:VCALENDAR',
-        'VERSION:2.0',
-        'PRODID:-//Bloom//Focus Tasks//EN',
-        'CALSCALE:GREGORIAN',
-        'METHOD:PUBLISH',
-        'BEGIN:VEVENT',
-        `UID:bloom-task-${task.id}-${Date.now()}@bloom.app`,
-        `DTSTAMP:${fmtUtc(new Date())}`,
-        `DTSTART:${fmtUtc(start)}`,
-        `DTEND:${fmtUtc(end)}`,
-        `SUMMARY:${cleanIcs(`Bloom Focus: ${task.title}`)}`,
-        `DESCRIPTION:${cleanIcs(`Category: ${task.category || 'Focus'} | Priority: ${(task.priority || 'medium').toUpperCase()} | Block: ${durationMins} mins`)}`,
-        'END:VEVENT',
-        'END:VCALENDAR'
-    ].join('\r\n');
-
-    const blob = new Blob([icsLines], { type: 'text/calendar;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    const slug =
-        String(task.title || 'bloom-task')
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/^-|-$/g, '') || 'bloom-task';
-
-    link.href = url;
-    link.download = `${slug}.ics`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
 // --- GEMINI AI MICRO-STEPS FOR TASKS ---
@@ -475,55 +240,31 @@ function renderTasks() {
 
     container.innerHTML = filtered.map(t => {
         const escapedTitle = escapeJsSingleQuote(t.title);
-        const escapedId = escapeJsSingleQuote(String(t.id));
         return `
-        <div class="p-4 rounded-2xl bg-slate-900/80 border ${t.completed ? 'border-slate-800 opacity-60' : 'border-white/10'} transition-all hover:border-white/20 bloom-subtle-card space-y-2.5">
-            <div class="flex items-center justify-between gap-2">
-                <div class="flex items-center space-x-3 min-w-0">
-                    <button type="button" onclick="toggleTask(${t.id})" class="p-1 rounded-lg shrink-0 ${t.completed ? 'bg-rose-500 text-white' : 'border border-slate-600 hover:border-rose-400'}">
+        <div class="p-4 rounded-2xl bg-slate-900/80 border ${t.completed ? 'border-slate-800 opacity-60' : 'border-white/10'} transition-all hover:border-white/20 bloom-subtle-card">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <button type="button" onclick="toggleTask(${t.id})" class="p-1 rounded-lg ${t.completed ? 'bg-rose-500 text-white' : 'border border-slate-600 hover:border-rose-400'}">
                         <i data-lucide="${t.completed ? 'check-square' : 'square'}" class="w-5 h-5"></i>
                     </button>
-                    <div class="min-w-0">
-                        <p class="text-sm font-semibold text-white truncate ${t.completed ? 'line-through text-slate-500' : ''}">${escapeHtml(t.title)}</p>
+                    <div>
+                        <p class="text-sm font-semibold text-white ${t.completed ? 'line-through text-slate-500' : ''}">${escapeHtml(t.title)}</p>
                         <span class="text-xs text-slate-400">${escapeHtml(t.category)}</span>
                     </div>
                 </div>
-                <div class="flex items-center space-x-2 shrink-0">
+                <div class="flex items-center space-x-3">
                     ${priorityBadges[t.priority] || priorityBadges.medium}
-                    <button type="button" onclick="deleteTask(${t.id})" class="text-slate-500 hover:text-red-400 p-1" title="Delete task">
+                    <button type="button" onclick="deleteTask(${t.id})" class="text-slate-500 hover:text-red-400 p-1">
                         <i data-lucide="trash-2" class="w-4 h-4"></i>
                     </button>
                 </div>
             </div>
-
-            <div class="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-white/5">
+            <div id="ai-steps-${t.id}" class="mt-2 pt-2 border-t border-white/5">
                 <button type="button" onclick="fetchAiMicroSteps('${escapedTitle}', 'ai-steps-${t.id}')" class="text-xs text-teal-400 hover:text-teal-300 font-medium flex items-center gap-1.5 transition-colors">
                     <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
                     <span>Generate BloomAI Micro-Steps</span>
                 </button>
-
-                <div class="flex items-center gap-2 flex-wrap">
-                    <button
-                        type="button"
-                        onclick="syncTaskToGoogleCalendar('${escapedId}')"
-                        class="text-xs px-2.5 py-1 rounded-lg bg-sky-500/15 hover:bg-sky-500/25 border border-sky-400/35 text-sky-200 font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
-                    >
-                        <i data-lucide="calendar-plus" class="w-3.5 h-3.5"></i>
-                        <span>Sync to Google Calendar</span>
-                    </button>
-                    <button
-                        type="button"
-                        onclick="downloadTaskIcs('${escapedId}')"
-                        class="text-xs px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 transition-colors cursor-pointer"
-                        title="Download .ics calendar file"
-                    >
-                        .ics
-                    </button>
-                </div>
             </div>
-
-            <div id="gcal-status-${t.id}"></div>
-            <div id="ai-steps-${t.id}"></div>
         </div>
         `;
     }).join('');
@@ -619,9 +360,9 @@ const learningData = {
             title: 'Balancing High School & Late Night Shifts',
             desc: 'Practical strategies to communicate with managers about homework deadlines, protect sleep, and avoid shift burnout.',
             type: 'Article + Video + Podcast • 4 min read',
-            videoPath: 'videos/balancing-high-school-late-night-shifts.mp4.mp4',
-            podcastPath: 'https://xmqmrkqyjnbupyalhnib.supabase.co/storage/v1/object/public/guidance_media/podcasts/balancing-high-school-late-night-shifts.m4a.m4a',
-            transcriptPath: 'videos/Studying With a Job_Transcript.txt',
+           videoPath: 'videos/balancing-high-school-late-shifts.mp4.mp4',
+            podcastPath: 'https://xmqmrkqyjnbupyalhnib.supabase.co/storage/v1/object/public/guidance_media/podcasts/balancing-high-school-late-shifts.m4a.m4a',
+        transcriptPath: 'videos/Studying With a Job_Transcript.txt', // <-- Match the exact full filename in your bucket root!
             bloomPrompt: `Walk me through "Balancing High School & Late Night Shifts" in a warm, conversational way. Break down realistic habits for handling schoolwork, late shifts, and energy without burning out, and ask how it fits my week.`
         },
         {
@@ -1053,41 +794,66 @@ function formatAiMessageContent(rawText) {
     try {
         html = window.marked
             ? marked.parse(processedText, { breaks: true, gfm: true })
-            : `<p>${escapeHtml(processedText).replace(/\n/g, '<br>')}</p>`;
+            : escapeHtml(processedText).replace(/\n/g, '<br>');
     } catch {
-        html = `<p>${escapeHtml(processedText).replace(/\n/g, '<br>')}</p>`;
+        html = escapeHtml(processedText).replace(/\n/g, '<br>');
     }
 
-    mermaidBlocks.forEach((block, idx) => {
-        html = html.replace(`%%MERMAID_BLOCK_${idx}%%`, block);
+    html = html
+        .replace(/<table>/g, '<div class="my-3 overflow-x-auto rounded-xl border border-white/10"><table class="w-full text-left text-xs border-collapse">')
+        .replace(/<\/table>/g, '</table></div>')
+        .replace(/<thead>/g, '<thead class="bg-slate-900/90 text-rose-300 uppercase text-[11px]">')
+        .replace(/<th>/g, '<th class="p-2.5 border-b border-white/10 font-semibold whitespace-nowrap">')
+        .replace(/<td>/g, '<td class="p-2.5 border-b border-white/5 text-slate-200 align-top">')
+        .replace(/<h1>/g, '<h1 class="text-lg font-bold text-white mt-3 mb-1.5">')
+        .replace(/<h2>/g, '<h2 class="text-base font-bold text-rose-300 mt-3 mb-1.5">')
+        .replace(/<h3>/g, '<h3 class="text-sm font-bold text-white mt-2.5 mb-1">')
+        .replace(/<ul>/g, '<ul class="list-disc pl-5 my-2 space-y-1">')
+        .replace(/<ol>/g, '<ol class="list-decimal pl-5 my-2 space-y-1">')
+        .replace(/<p>/g, '<p class="mb-2 last:mb-0">');
+
+    mermaidBlocks.forEach((block, i) => {
+        html = html.replace(`%%MERMAID_BLOCK_${i}%%`, block);
     });
 
     return html;
 }
 
-// --- MULTI-CHAT SESSIONS WITH SUPABASE ---
-let activeChatSessionId = null;
+async function renderDiagramsInChat() {
+    if (window.mermaid) {
+        try {
+            await mermaid.run({ querySelector: '#chat-messages .mermaid' });
+        } catch (err) {
+            console.warn("Diagram render warning:", err);
+        }
+    }
+}
+
+// --- EXPLORE BLOOM AI MULTI-CHAT SYSTEM ---
+let currentSessionId = null;
 let chatSessions = [];
+let isSendingMessage = false;
 
 async function loadChatSessions() {
     const { data: { session } } = await supabaseClient.auth.getSession();
     const listContainer = document.getElementById('chat-sessions-list');
-    const chatBox = document.getElementById('chat-messages');
+    const chatContainer = document.getElementById('chat-messages');
 
     if (!session) {
-        if (listContainer) listContainer.innerHTML = `<p class="text-xs text-slate-500 p-2 text-center">Sign in to save chat history</p>`;
-        if (chatBox) {
-            chatBox.innerHTML = `
-                <div class="flex items-start space-x-3">
-                    <div class="w-8 h-8 rounded-full bg-rose-500/20 flex items-center justify-center border border-rose-500/40 shrink-0">
-                        <i data-lucide="bot" class="w-4 h-4 text-rose-400"></i>
-                    </div>
-                    <div class="p-4 rounded-2xl rounded-tl-sm bg-slate-900 border border-white/10 text-sm text-slate-200 max-w-[85%] bloom-chat-bubble-ai">
-                        Hey! I'm BloomAI. You can chat with me right now, or log in to save multiple chat threads across devices.
-                    </div>
+        chatSessions = [];
+        currentSessionId = null;
+        if (listContainer) {
+            listContainer.innerHTML = `<p class="text-xs text-slate-400 p-2">Log in to save and switch between chats.</p>`;
+        }
+        if (chatContainer) {
+            chatContainer.innerHTML = `
+                <div class="text-center py-12 space-y-3">
+                    <p class="text-slate-400 text-sm">Please log in to chat with Bloom AI.</p>
+                    <button type="button" onclick="switchTab('auth')" class="px-4 py-2 rounded-xl bg-rose-500 text-white text-xs font-semibold hover:bg-rose-600 transition-colors">
+                        Log In Now
+                    </button>
                 </div>
             `;
-            if (window.lucide) lucide.createIcons();
         }
         return;
     }
@@ -1098,20 +864,16 @@ async function loadChatSessions() {
         .order('created_at', { ascending: false });
 
     if (error) {
-        console.error('Error loading chat sessions:', error);
+        console.error("Error loading chat sessions:", error);
         return;
     }
 
     chatSessions = data || [];
     renderChatSessionsList();
 
-    if (chatSessions.length > 0) {
-        if (!activeChatSessionId || !chatSessions.some(s => s.id === activeChatSessionId)) {
-            await selectChatSession(chatSessions[0].id);
-        } else {
-            await selectChatSession(activeChatSessionId);
-        }
-    } else {
+    if (chatSessions.length > 0 && !currentSessionId) {
+        selectChatSession(chatSessions[0].id);
+    } else if (chatSessions.length === 0) {
         await createNewChatSession();
     }
 }
@@ -1121,78 +883,453 @@ function renderChatSessionsList() {
     if (!listContainer) return;
 
     if (chatSessions.length === 0) {
-        listContainer.innerHTML = `<p class="text-xs text-slate-500 p-2 text-center">No chats yet.</p>`;
+        listContainer.innerHTML = `<p class="text-xs text-slate-500 px-2 py-1">No chats yet.</p>`;
         return;
     }
 
-    listContainer.innerHTML = chatSessions.map(s => {
-        const isActive = s.id === activeChatSessionId;
-        const safeTitle = escapeHtml(s.title || 'New Chat');
-        return `
-            <div class="group flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-colors ${isActive ? 'bg-rose-500/20 border border-rose-500/40 text-white' : 'hover:bg-white/5 text-slate-400 border border-transparent'}" onclick="selectChatSession('${s.id}')">
-                <div class="flex items-center gap-2 truncate pr-1 flex-1">
-                    <i data-lucide="message-square" class="w-3.5 h-3.5 shrink-0 ${isActive ? 'text-rose-400' : 'text-slate-500'}"></i>
-                    <span class="text-xs font-medium truncate">${safeTitle}</span>
-                </div>
-                <button type="button" onclick="event.stopPropagation(); deleteChatSession('${s.id}')" class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 p-1 rounded transition-opacity" title="Delete chat">
-                    <i data-lucide="trash-2" class="w-3 h-3"></i>
-                </button>
-            </div>
-        `;
-    }).join('');
+    listContainer.innerHTML = chatSessions.map(s => `
+        <div onclick="selectChatSession('${escapeJsSingleQuote(s.id)}')" class="group flex items-center justify-between p-2.5 rounded-xl text-xs font-medium cursor-pointer transition-all ${s.id === currentSessionId ? 'bg-rose-500/20 border border-rose-500/40 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'}">
+            <span class="truncate max-w-[160px]">${escapeHtml(s.title)}</span>
+            <button type="button" onclick="deleteChatSession(event, '${escapeJsSingleQuote(s.id)}')" class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-rose-400 p-1 transition-opacity" title="Delete chat">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            </button>
+        </div>
+    `).join('');
     if (window.lucide) lucide.createIcons();
 }
 
 async function createNewChatSession() {
     const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session) return;
+    if (!session) {
+        alert("Please log in to create a chat.");
+        switchTab('auth');
+        return;
+    }
 
     const { data, error } = await supabaseClient
         .from('chat_sessions')
-        .insert([{ title: 'New Chat', user_id: session.user.id }])
+        .insert([{ user_id: session.user.id, title: 'New Conversation' }])
         .select()
         .single();
 
     if (error) {
-        console.error('Error creating chat session:', error);
+        console.error("Error creating session:", error);
         return;
     }
 
-    activeChatSessionId = data.id;
     chatSessions.unshift(data);
+    selectChatSession(data.id);
     renderChatSessionsList();
-    renderWelcomeMessage();
 }
 
-async function deleteChatSession(sessionId) {
+async function selectChatSession(sessionId) {
+    currentSessionId = sessionId;
+    renderChatSessionsList();
+
+    const activeSession = chatSessions.find(s => s.id === sessionId);
+    const titleEl = document.getElementById('active-chat-title');
+    if (titleEl && activeSession) {
+        titleEl.innerText = activeSession.title;
+    }
+
+    const chatContainer = document.getElementById('chat-messages');
+    if (!chatContainer) return;
+
+    chatContainer.innerHTML = `<div class="text-center text-xs text-slate-500 py-4">Loading conversation...</div>`;
+
+    const { data, error } = await supabaseClient
+        .from('chat_messages')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('created_at', { ascending: true });
+
+    if (error || !data || data.length === 0) {
+        chatContainer.innerHTML = `
+            <div class="flex items-start space-x-3">
+                <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
+                    <i data-lucide="flower-2" class="w-4 h-4"></i>
+                </div>
+                <div class="bloom-chat-bubble-ai bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 text-sm leading-relaxed">
+                    Hey there. 👋 I’m Bloom. Ask me anything, upload an image or file, or ask me to create a visual roadmap!
+                </div>
+            </div>
+        `;
+    } else {
+        chatContainer.innerHTML = data.map(m => {
+            if (m.role === 'user') {
+                return `
+                    <div class="flex items-start justify-end space-x-3">
+                        <div class="bg-rose-600 text-white p-4 rounded-2xl rounded-tr-none max-w-[85%] text-sm leading-relaxed shadow-md whitespace-pre-wrap">
+                            ${escapeHtml(m.content)}
+                        </div>
+                    </div>
+                `;
+            } else {
+                return `
+                    <div class="flex items-start space-x-3">
+                        <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
+                            <i data-lucide="flower-2" class="w-4 h-4"></i>
+                        </div>
+                        <div class="bloom-chat-bubble-ai bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 text-sm leading-relaxed">
+                            ${formatAiMessageContent(m.content)}
+                        </div>
+                    </div>
+                `;
+            }
+        }).join('');
+    }
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+    if (window.lucide) lucide.createIcons();
+    await renderDiagramsInChat();
+}
+
+async function deleteChatSession(event, sessionId) {
+    event.stopPropagation();
+    if (!confirm("Delete this chat conversation?")) return;
+
     const { error } = await supabaseClient
         .from('chat_sessions')
         .delete()
         .eq('id', sessionId);
 
     if (error) {
-        console.error('Error deleting session:', error);
+        console.error("Error deleting session:", error);
         return;
     }
 
     chatSessions = chatSessions.filter(s => s.id !== sessionId);
-    if (activeChatSessionId === sessionId) {
-        activeChatSessionId = chatSessions.length > 0 ? chatSessions[0].id : null;
-    }
-
-    renderChatSessionsList();
-    if (activeChatSessionId) {
-        await selectChatSession(activeChatSessionId);
+    if (currentSessionId === sessionId) {
+        currentSessionId = null;
+        if (chatSessions.length > 0) {
+            selectChatSession(chatSessions[0].id);
+        } else {
+            await createNewChatSession();
+        }
     } else {
-        await createNewChatSession();
+        renderChatSessionsList();
     }
 }
 
-async function selectChatSession(sessionId) {
-    activeChatSessionId = sessionId;
-    renderChatSessionsList();
+function sendQuickPrompt(promptText) {
+    const input = document.getElementById('chat-input');
+    if (!input) return;
+    input.value = promptText;
+    handleSendMessage(new Event('submit'));
+}
 
-    const chatBox = document.getElementById('chat-messages');
-    if (!chatBox) return;
+async function handleSendMessage(e) {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    if (isSendingMessage) return;
 
-    chat
+    const input = document.getElementById('chat-input');
+    const text = input ? input.value.trim() : '';
+    if (!text && attachedFiles.length === 0) return;
+
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) {
+        alert("Please log in to chat.");
+        switchTab('auth');
+        return;
+    }
+
+    if (!currentSessionId) {
+        await createNewChatSession();
+    }
+
+    const chatContainer = document.getElementById('chat-messages');
+    const filesSnapshot = [...attachedFiles];
+    const attachedNames = filesSnapshot.map(f => f.name).join(', ');
+    const displayPrompt = text
+        ? (attachedNames ? `${text} [Attached: ${attachedNames}]` : text)
+        : `[Attached: ${attachedNames}]`;
+
+    if (input) input.value = '';
+    attachedFiles = [];
+    renderAttachmentsPreview();
+    isSendingMessage = true;
+
+    if (chatContainer) {
+        chatContainer.insertAdjacentHTML('beforeend', `
+            <div class="flex items-start justify-end space-x-3">
+                <div class="bg-rose-600 text-white p-4 rounded-2xl rounded-tr-none max-w-[85%] text-sm leading-relaxed shadow-md whitespace-pre-wrap">
+                    ${escapeHtml(displayPrompt)}
+                </div>
+            </div>
+        `);
+
+        chatContainer.insertAdjacentHTML('beforeend', `
+            <div id="bloom-typing-row" class="flex items-start space-x-3">
+                <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
+                    <i data-lucide="flower-2" class="w-4 h-4"></i>
+                </div>
+                <div class="bloom-chat-bubble-ai bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none text-slate-400 text-sm animate-pulse">
+                    Bloom is thinking...
+                </div>
+            </div>
+        `);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+        if (window.lucide) lucide.createIcons();
+    }
+
+    try {
+        await supabaseClient.from('chat_messages').insert([{
+            session_id: currentSessionId,
+            user_id: session.user.id,
+            role: 'user',
+            content: displayPrompt
+        }]);
+
+        const activeSession = chatSessions.find(s => s.id === currentSessionId);
+        if (activeSession && activeSession.title === 'New Conversation' && text) {
+            const shortTitle = text.slice(0, 36);
+            await supabaseClient
+                .from('chat_sessions')
+                .update({ title: shortTitle })
+                .eq('id', currentSessionId);
+            activeSession.title = shortTitle;
+            const titleEl = document.getElementById('active-chat-title');
+            if (titleEl) titleEl.innerText = shortTitle;
+            renderChatSessionsList();
+        }
+
+        const { data, error } = await supabaseClient.functions.invoke('gemini-proxy', {
+            body: {
+                prompt: text || 'Analyze the attached file(s).',
+                files: filesSnapshot
+            }
+        });
+
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error.message || JSON.stringify(data.error));
+
+        const rawReply =
+            data?.candidates?.[0]?.content?.parts?.[0]?.text
+            || data?.reply
+            || "I didn't receive a text response—please try again.";
+        const formattedHtml = formatAiMessageContent(rawReply);
+
+        document.getElementById('bloom-typing-row')?.remove();
+
+        if (chatContainer) {
+            chatContainer.insertAdjacentHTML('beforeend', `
+                <div class="flex items-start space-x-3">
+                    <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
+                        <i data-lucide="flower-2" class="w-4 h-4"></i>
+                    </div>
+                    <div class="bloom-chat-bubble-ai bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 text-sm leading-relaxed">
+                        ${formattedHtml}
+                    </div>
+                </div>
+            `);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            if (window.lucide) lucide.createIcons();
+            await renderDiagramsInChat();
+        }
+
+        await supabaseClient.from('chat_messages').insert([{
+            session_id: currentSessionId,
+            user_id: session.user.id,
+            role: 'assistant',
+            content: rawReply
+        }]);
+    } catch (err) {
+        console.error("Chat error:", err);
+        document.getElementById('bloom-typing-row')?.remove();
+        if (chatContainer) {
+            chatContainer.insertAdjacentHTML('beforeend', `
+                <div class="flex items-start space-x-3">
+                    <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
+                        <i data-lucide="alert-circle" class="w-4 h-4"></i>
+                    </div>
+                    <div class="bloom-chat-bubble-ai bg-slate-800/80 border border-rose-500/30 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-rose-300 text-sm">
+                        Couldn't complete that request: ${escapeHtml(err.message)}
+                    </div>
+                </div>
+            `);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            if (window.lucide) lucide.createIcons();
+        }
+    } finally {
+        isSendingMessage = false;
+    }
+}
+
+// --- AUTHENTICATION ---
+let isSignUpMode = false;
+
+function toggleAuthMode() {
+    isSignUpMode = !isSignUpMode;
+    const titleEl = document.getElementById('auth-title');
+    const subtitleEl = document.getElementById('auth-subtitle');
+    const submitBtn = document.getElementById('auth-submit-btn');
+    const toggleBtn = document.getElementById('auth-toggle-btn');
+
+    if (titleEl) titleEl.innerText = isSignUpMode ? 'Create Your Account' : 'Welcome Back';
+    if (subtitleEl) subtitleEl.innerText = isSignUpMode
+        ? 'Sign up to save tasks and Bloom AI chats.'
+        : 'Sign in to sync your tasks and Bloom AI chats.';
+    if (submitBtn) submitBtn.innerText = isSignUpMode ? 'Create Account' : 'Sign In';
+    if (toggleBtn) {
+        toggleBtn.innerHTML = isSignUpMode
+            ? 'Already have an account? <span class="font-bold text-white">Sign In</span>'
+            : "Don't have an account? <span class=\"font-bold text-white\">Sign Up</span>";
+    }
+}
+
+async function handleAuthSubmit(e) {
+    e.preventDefault();
+    const email = document.getElementById('auth-email')?.value.trim();
+    const password = document.getElementById('auth-password')?.value;
+    const errEl = document.getElementById('auth-error');
+    const okEl = document.getElementById('auth-success');
+
+    if (errEl) errEl.classList.add('hidden');
+    if (okEl) okEl.classList.add('hidden');
+
+    const res = isSignUpMode
+        ? await supabaseClient.auth.signUp({ email, password })
+        : await supabaseClient.auth.signInWithPassword({ email, password });
+
+    if (res.error) {
+        if (errEl) {
+            errEl.textContent = res.error.message;
+            errEl.classList.remove('hidden');
+        }
+        return;
+    }
+
+    if (isSignUpMode && !res.data.session) {
+        if (okEl) {
+            okEl.textContent = 'Check your email to confirm your account, then sign in.';
+            okEl.classList.remove('hidden');
+        }
+        return;
+    }
+
+    switchTab('home');
+}
+
+async function handleForgotPassword() {
+    const email = document.getElementById('auth-email')?.value.trim();
+    const errEl = document.getElementById('auth-error');
+    const okEl = document.getElementById('auth-success');
+
+    if (!email) {
+        if (errEl) {
+            errEl.textContent = 'Enter your email address first.';
+            errEl.classList.remove('hidden');
+        }
+        return;
+    }
+
+    const { error } = await supabaseClient.auth.resetPasswordForEmail(email);
+    if (error && errEl) {
+        errEl.textContent = error.message;
+        errEl.classList.remove('hidden');
+    } else if (okEl) {
+        okEl.textContent = 'Password reset link sent to your email.';
+        okEl.classList.remove('hidden');
+    }
+}
+
+async function handleUpdatePassword(e) {
+    e.preventDefault();
+    const password = document.getElementById('new-password')?.value;
+    const errEl = document.getElementById('reset-error');
+    const { error } = await supabaseClient.auth.updateUser({ password });
+    if (error && errEl) {
+        errEl.textContent = error.message;
+        errEl.classList.remove('hidden');
+    } else {
+        document.getElementById('reset-password-form')?.classList.add('hidden');
+        document.getElementById('auth-form')?.classList.remove('hidden');
+        switchTab('home');
+    }
+}
+
+async function syncAuthButton() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const btn = document.getElementById('auth-nav-btn');
+    if (!btn) return;
+
+    if (session) {
+        btn.innerHTML = `<i data-lucide="log-out" class="w-4 h-4"></i><span>Log Out</span>`;
+        btn.onclick = async () => {
+            await supabaseClient.auth.signOut();
+            switchTab('home');
+        };
+    } else {
+        btn.innerHTML = `<i data-lucide="log-in" class="w-4 h-4"></i><span>Log In</span>`;
+        btn.onclick = () => switchTab('auth');
+    }
+    if (window.lucide) lucide.createIcons();
+}
+
+// --- FOCUS RADIO ---
+let isPlayingMusic = false;
+
+function toggleMusic() {
+    const audio = document.getElementById('bg-audio');
+    const icon = document.getElementById('music-icon');
+    if (!audio) return;
+
+    if (isPlayingMusic) {
+        audio.pause();
+        isPlayingMusic = false;
+        if (icon) icon.setAttribute('data-lucide', 'play');
+    } else {
+        audio.play().then(() => {
+            isPlayingMusic = true;
+            if (icon) icon.setAttribute('data-lucide', 'pause');
+            if (window.lucide) lucide.createIcons();
+        }).catch(err => console.warn('Audio play blocked/error:', err));
+    }
+    if (window.lucide) lucide.createIcons();
+}
+
+function changeStation() {
+    const select = document.getElementById('music-station');
+    const audio = document.getElementById('bg-audio');
+    const source = document.getElementById('bg-audio-source');
+    if (!select || !audio || !source) return;
+
+    source.src = select.value;
+    audio.load();
+    if (isPlayingMusic) {
+        audio.play().catch(err => console.warn('Station switch error:', err));
+    }
+}
+
+function setMusicVolume(val) {
+    const audio = document.getElementById('bg-audio');
+    if (audio) audio.volume = parseFloat(val);
+}
+
+function handleAudioError() {
+    isPlayingMusic = false;
+    const icon = document.getElementById('music-icon');
+    if (icon) icon.setAttribute('data-lucide', 'play');
+    if (window.lucide) lucide.createIcons();
+}
+
+// --- INITIALIZATION ---
+document.addEventListener('DOMContentLoaded', async () => {
+    const taskForm = document.getElementById('task-form');
+    if (taskForm) taskForm.addEventListener('submit', handleAddTask);
+
+    const volInput = document.getElementById('music-volume');
+    const audio = document.getElementById('bg-audio');
+    if (volInput && audio) audio.volume = parseFloat(volInput.value);
+
+    supabaseClient.auth.onAuthStateChange((event) => {
+        syncAuthButton();
+        if (event === 'PASSWORD_RECOVERY') {
+            switchTab('auth');
+            document.getElementById('auth-form')?.classList.add('hidden');
+            document.getElementById('reset-password-form')?.classList.remove('hidden');
+        }
+    });
+
+    await syncAuthButton();
+    if (window.lucide) lucide.createIcons();
+});

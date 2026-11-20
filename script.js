@@ -360,10 +360,9 @@ const learningData = {
             title: 'Balancing High School & Late Night Shifts',
             desc: 'Practical strategies to communicate with managers about homework deadlines, protect sleep, and avoid shift burnout.',
             type: 'Article + Video + Podcast • 4 min read',
-            videoPath: 'videos/balancing-high-school-late-night-shifts.mp4',
+           videoPath: 'videos/balancing-high-school-late-night-shifts.mp4',
             podcastPath: 'podcasts/balancing-high-school-late-night-shifts.m4a',
-            transcriptPath: 'transcripts/balancing-high-school-late-night-shifts.txt',
-            transcriptText: `Paste your full transcript text here so it shows immediately even before uploading the .txt file to Supabase Storage.`,
+        transcriptPath: 'Studying With a Job_Transcript.txt', // <-- Match the exact full filename in your bucket root!
             bloomPrompt: `Walk me through "Balancing High School & Late Night Shifts" in a warm, conversational way. Break down realistic habits for handling schoolwork, late shifts, and energy without burning out, and ask how it fits my week.`
         },
         {

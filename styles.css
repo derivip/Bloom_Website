@@ -381,3 +381,64 @@ body::after {
     transform: none;
   }
 }
+/* =========================================================
+   FULL-SCREEN SUBTLE ANIMATED GRADIENT (BLOOM)
+   ========================================================= */
+html,
+body {
+  min-height: 100dvh;
+  background-color: #0b1020 !important;
+}
+
+/* Full-screen animated gradient layer across the whole viewport */
+.bloom-animated-bg {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 15% 20%, rgba(244, 63, 94, 0.16), transparent 45%),
+    radial-gradient(circle at 85% 25%, rgba(56, 189, 248, 0.16), transparent 48%),
+    radial-gradient(circle at 50% 80%, rgba(168, 85, 247, 0.14), transparent 52%),
+    linear-gradient(125deg, rgba(15, 23, 42, 0.85), rgba(24, 18, 43, 0.85), rgba(11, 27, 46, 0.85));
+  background-size: 160% 160%;
+  animation: bloomFullScreenFlow 20s ease-in-out infinite alternate;
+  will-change: background-position, transform;
+}
+
+@keyframes bloomFullScreenFlow {
+  0% {
+    background-position: 0% 20%;
+    transform: scale(1);
+  }
+  50% {
+    background-position: 100% 60%;
+    transform: scale(1.03);
+  }
+  100% {
+    background-position: 35% 100%;
+    transform: scale(1.01);
+  }
+}
+
+/* Keep your page content & cards cleanly above the background */
+body > :not(.bloom-animated-bg) {
+  position: relative;
+  z-index: 1;
+}
+
+/* Make cards & panels slightly translucent so the subtle animation shows through */
+.bloom-subtle-card {
+  background: rgba(18, 25, 46, 0.62) !important;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bloom-animated-bg {
+    animation: none;
+  }
+}

@@ -1,7 +1,7 @@
 // BLOOM APPLICATION SCRIPT (2026 EDITION - SUPABASE, GEMINI AI, MULTIMODAL, MULTI-CHAT & FOCUS RADIO)
 
 // SUPABASE CONFIGURATION
-const SUPABASE_URL = '[https://xmqmrkqyjnbupyalhnib.supabase.co](https://xmqmrkqyjnbupyalhnib.supabase.co)';
+const SUPABASE_URL = 'https://xmqmrkqyjnbupyalhnib.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_7AqK322TINFq1y39lMgvTw_Z7Itc79G';
 
 // Initialize Supabase Client

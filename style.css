@@ -1,43 +1,44 @@
 /* =========================================================
-   BLOOM — FULL-SPECTRUM MEDIUM-TO-DARK ANIMATED THEME
+   BLOOM — BOLD FULL-SPECTRUM MEDIUM-TO-DARK ANIMATED THEME
    ========================================================= */
 
 :root {
-  /* Spectrum stops kept in medium-to-dark saturation/lightness */
-  --spec-red: rgba(190, 45, 72, 0.28);
-  --spec-orange: rgba(194, 82, 28, 0.26);
-  --spec-yellow: rgba(176, 134, 24, 0.24);
-  --spec-green: rgba(24, 136, 96, 0.26);
-  --spec-cyan: rgba(20, 128, 168, 0.28);
-  --spec-blue: rgba(44, 78, 176, 0.28);
-  --spec-violet: rgba(118, 48, 168, 0.28);
+  /* Rich, saturated medium-to-dark spectrum tones */
+  --spec-red: rgba(225, 29, 72, 0.44);
+  --spec-orange: rgba(234, 88, 12, 0.42);
+  --spec-yellow: rgba(202, 138, 4, 0.38);
+  --spec-green: rgba(5, 150, 105, 0.42);
+  --spec-cyan: rgba(2, 132, 199, 0.44);
+  --spec-blue: rgba(37, 99, 235, 0.44);
+  --spec-violet: rgba(124, 58, 237, 0.44);
+  --spec-magenta: rgba(192, 38, 211, 0.40);
 
-  --bg-base: #111626;
+  --bg-base: #0d1221;
   --bg-spectrum: linear-gradient(
     130deg,
-    #1a1426 0%,
-    #12212b 25%,
-    #1c182e 50%,
-    #112424 75%,
-    #1a1426 100%
+    #1f1229 0%,
+    #0e2433 24%,
+    #24142c 48%,
+    #0d2624 72%,
+    #19122e 100%
   );
 
-  --glass-bg: rgba(22, 30, 48, 0.66);
-  --glass-elevated: rgba(30, 40, 64, 0.80);
-  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-bg: rgba(19, 26, 44, 0.62);
+  --glass-elevated: rgba(27, 37, 60, 0.78);
+  --glass-border: rgba(255, 255, 255, 0.15);
 
-  --text-primary: #f1f5f9;
-  --text-secondary: #cbd5e1;
+  --text-primary: #f8fafc;
+  --text-secondary: #e2e8f0;
   --text-muted: #94a3b8;
-  --accent-heading: #e2e8f0;
-  --accent-table-head: rgba(148, 163, 184, 0.16);
-  --accent-table-text: #f1f5f9;
-  --accent-code: #93c5fd;
-  --accent-glow: rgba(99, 102, 241, 0.22);
+  --accent-heading: #f1f5f9;
+  --accent-table-head: rgba(225, 29, 72, 0.24);
+  --accent-table-text: #ffe4e6;
+  --accent-code: #7dd3fc;
+  --accent-glow: rgba(139, 92, 246, 0.34);
 }
 
 /* =========================================================
-   BASE RESET & FULL-SPECTRUM SHIFTING BASE
+   BASE RESET & BOLD SHIFTING SPECTRUM CANVAS
    ========================================================= */
 *,
 *::before,
@@ -54,8 +55,8 @@ body {
   color: var(--text-primary) !important;
   background-color: var(--bg-base) !important;
   background-image: var(--bg-spectrum) !important;
-  background-size: 320% 320% !important;
-  animation: bloomSpectrumBaseShift 36s ease-in-out infinite alternate;
+  background-size: 360% 360% !important;
+  animation: bloomBoldSpectrumShift 28s ease-in-out infinite alternate;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
 }
@@ -64,30 +65,31 @@ body {
   position: relative;
 }
 
-/* Layer 1: Full-spectrum color sweep across the visual spectrum */
+/* Layer 1: Bold Full-Spectrum Conic Sweep */
 body::before {
   content: "";
   position: fixed;
-  inset: -35%;
+  inset: -38%;
   z-index: 0;
   pointer-events: none;
   background: conic-gradient(
     from 0deg at 50% 50%,
-    var(--spec-red) 0deg 52deg,
-    var(--spec-orange) 52deg 104deg,
-    var(--spec-yellow) 104deg 156deg,
-    var(--spec-green) 156deg 208deg,
-    var(--spec-cyan) 208deg 260deg,
-    var(--spec-blue) 260deg 312deg,
-    var(--spec-violet) 312deg 360deg
+    var(--spec-red) 0deg 45deg,
+    var(--spec-orange) 45deg 90deg,
+    var(--spec-yellow) 90deg 135deg,
+    var(--spec-green) 135deg 180deg,
+    var(--spec-cyan) 180deg 225deg,
+    var(--spec-blue) 225deg 270deg,
+    var(--spec-violet) 270deg 315deg,
+    var(--spec-magenta) 315deg 360deg
   );
-  filter: blur(78px);
-  opacity: 0.78;
-  animation: bloomFullSpectrumWheel 42s linear infinite;
+  filter: blur(72px) saturate(1.25);
+  opacity: 0.92;
+  animation: bloomBoldWheelSpin 34s linear infinite;
   will-change: transform, filter;
 }
 
-/* Layer 2: Soft ambient light motes */
+/* Layer 2: Crisp Ambient Bokeh Dots */
 body::after {
   content: "";
   position: fixed;
@@ -95,115 +97,116 @@ body::after {
   z-index: 0;
   pointer-events: none;
   background-image:
-    radial-gradient(2.5px 2.5px at 16% 24%, rgba(255, 255, 255, 0.18), transparent 70%),
-    radial-gradient(3px 3px at 34% 72%, rgba(255, 255, 255, 0.16), transparent 70%),
-    radial-gradient(2px 2px at 56% 32%, rgba(255, 255, 255, 0.15), transparent 70%),
-    radial-gradient(3px 3px at 74% 68%, rgba(255, 255, 255, 0.18), transparent 70%),
-    radial-gradient(2.5px 2.5px at 86% 28%, rgba(255, 255, 255, 0.16), transparent 70%);
-  animation: bloomSpectrumMotes 18s ease-in-out infinite alternate;
+    radial-gradient(3px 3px at 15% 22%, rgba(255, 255, 255, 0.26), transparent 75%),
+    radial-gradient(3.5px 3.5px at 32% 74%, rgba(255, 255, 255, 0.22), transparent 75%),
+    radial-gradient(2.5px 2.5px at 54% 28%, rgba(255, 255, 255, 0.24), transparent 75%),
+    radial-gradient(3.5px 3.5px at 76% 68%, rgba(255, 255, 255, 0.25), transparent 75%),
+    radial-gradient(3px 3px at 88% 26%, rgba(255, 255, 255, 0.24), transparent 75%),
+    radial-gradient(2.5px 2.5px at 44% 86%, rgba(255, 255, 255, 0.22), transparent 75%);
+  animation: bloomBoldMotes 15s ease-in-out infinite alternate;
   will-change: transform, opacity;
 }
 
-/* Layer 3: Drifting multi-band spectrum clouds */
+/* Layer 3: Bold Multi-Hue Aurora Clouds */
 .bloom-animated-bg {
   position: fixed;
-  inset: -25%;
-  width: 150vw;
-  height: 150vh;
+  inset: -26%;
+  width: 152vw;
+  height: 152vh;
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(circle at 18% 25%, var(--spec-red), transparent 44%),
-    radial-gradient(circle at 82% 28%, var(--spec-cyan), transparent 46%),
-    radial-gradient(circle at 32% 78%, var(--spec-green), transparent 48%),
-    radial-gradient(circle at 76% 76%, var(--spec-violet), transparent 46%);
-  filter: blur(60px);
+    radial-gradient(circle at 16% 24%, var(--spec-red), transparent 46%),
+    radial-gradient(circle at 84% 26%, var(--spec-cyan), transparent 48%),
+    radial-gradient(circle at 28% 80%, var(--spec-green), transparent 50%),
+    radial-gradient(circle at 78% 78%, var(--spec-violet), transparent 48%);
+  filter: blur(54px) saturate(1.22);
   animation:
-    bloomSpectrumCloudDrift 22s ease-in-out infinite alternate,
-    bloomSpectrumHueCycle 48s linear infinite;
+    bloomBoldCloudDrift 18s ease-in-out infinite alternate,
+    bloomBoldHueCycle 38s linear infinite;
   will-change: transform, filter;
 }
 
-/* Layer 4: Secondary warm-to-cool spectrum wave */
+/* Layer 4: Counter-Drifting Warm & Cool Spectrum Wave */
 .bloom-animated-bg::after {
   content: "";
   position: absolute;
-  inset: 8%;
+  inset: 6%;
   background:
-    radial-gradient(circle at 52% 28%, var(--spec-orange), transparent 42%),
-    radial-gradient(circle at 45% 72%, var(--spec-blue), transparent 46%),
-    radial-gradient(circle at 68% 48%, var(--spec-yellow), transparent 40%);
-  filter: blur(68px);
-  opacity: 0.72;
-  animation: bloomSpectrumCounterWave 26s ease-in-out infinite alternate;
+    radial-gradient(circle at 54% 26%, var(--spec-orange), transparent 44%),
+    radial-gradient(circle at 42% 72%, var(--spec-blue), transparent 48%),
+    radial-gradient(circle at 70% 48%, var(--spec-yellow), transparent 42%);
+  filter: blur(60px) saturate(1.2);
+  opacity: 0.86;
+  animation: bloomBoldCounterWave 22s ease-in-out infinite alternate;
   will-change: transform;
 }
 
-@keyframes bloomSpectrumBaseShift {
+@keyframes bloomBoldSpectrumShift {
   0% {
-    background-position: 0% 20%;
+    background-position: 0% 15%;
   }
   50% {
-    background-position: 100% 65%;
+    background-position: 100% 70%;
   }
   100% {
-    background-position: 35% 100%;
+    background-position: 25% 100%;
   }
 }
 
-@keyframes bloomFullSpectrumWheel {
+@keyframes bloomBoldWheelSpin {
   0% {
-    transform: rotate(0deg) scale(1.08);
+    transform: rotate(0deg) scale(1.1);
   }
   50% {
-    transform: rotate(180deg) scale(1.14);
+    transform: rotate(180deg) scale(1.16);
   }
   100% {
-    transform: rotate(360deg) scale(1.08);
+    transform: rotate(360deg) scale(1.1);
   }
 }
 
-@keyframes bloomSpectrumCloudDrift {
+@keyframes bloomBoldCloudDrift {
   0% {
-    transform: translate3d(-3%, -2%, 0) scale(1);
+    transform: translate3d(-4%, -3%, 0) scale(1);
   }
   50% {
-    transform: translate3d(3%, 2.5%, 0) scale(1.07);
+    transform: translate3d(4%, 3%, 0) scale(1.09);
   }
   100% {
-    transform: translate3d(-2%, 3%, 0) scale(1.04);
+    transform: translate3d(-3%, 3.5%, 0) scale(1.05);
   }
 }
 
-@keyframes bloomSpectrumHueCycle {
+@keyframes bloomBoldHueCycle {
   0% {
-    filter: blur(60px) hue-rotate(0deg);
+    filter: blur(54px) saturate(1.22) hue-rotate(0deg);
   }
   100% {
-    filter: blur(60px) hue-rotate(360deg);
+    filter: blur(54px) saturate(1.22) hue-rotate(360deg);
   }
 }
 
-@keyframes bloomSpectrumCounterWave {
+@keyframes bloomBoldCounterWave {
   0% {
-    transform: translate3d(3.5%, 2.5%, 0) scale(1.04);
+    transform: translate3d(4%, 3%, 0) scale(1.06);
   }
   50% {
-    transform: translate3d(-3.5%, -2.5%, 0) scale(0.98);
+    transform: translate3d(-4%, -3%, 0) scale(0.98);
   }
   100% {
-    transform: translate3d(2%, -3.5%, 0) scale(1.06);
+    transform: translate3d(2.5%, -4%, 0) scale(1.08);
   }
 }
 
-@keyframes bloomSpectrumMotes {
+@keyframes bloomBoldMotes {
   0% {
     transform: translate3d(0, 0, 0);
-    opacity: 0.45;
+    opacity: 0.55;
   }
   100% {
-    transform: translate3d(-1.5%, -2.5%, 0);
-    opacity: 0.8;
+    transform: translate3d(-2%, -3%, 0);
+    opacity: 0.92;
   }
 }
 
@@ -223,7 +226,7 @@ body > :not(.bloom-animated-bg) {
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--glass-border) !important;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28), 0 0 24px -10px var(--accent-glow);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.34), 0 0 28px -10px var(--accent-glow);
   color: var(--text-primary) !important;
   transition: background 0.4s ease, border-color 0.35s ease, box-shadow 0.4s ease, transform 0.2s ease;
 }
@@ -231,7 +234,7 @@ body > :not(.bloom-animated-bg) {
 nav,
 .fixed.bottom-0,
 .md\:hidden.fixed.bottom-14 {
-  background: rgba(17, 22, 38, 0.76) !important;
+  background: rgba(13, 18, 33, 0.78) !important;
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   border-color: var(--glass-border) !important;
@@ -240,7 +243,7 @@ nav,
 
 body [class*="bg-slate-950"],
 body [class*="bg-slate-900"] {
-  background-color: rgba(20, 28, 46, 0.66) !important;
+  background-color: rgba(18, 25, 43, 0.64) !important;
   color: var(--text-primary) !important;
   border-color: var(--glass-border) !important;
 }
@@ -248,9 +251,9 @@ body [class*="bg-slate-900"] {
 body input,
 body select,
 body textarea {
-  background-color: rgba(15, 23, 42, 0.74) !important;
+  background-color: rgba(13, 19, 34, 0.76) !important;
   color: var(--text-primary) !important;
-  border-color: rgba(255, 255, 255, 0.14) !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
 }
 
 body input::placeholder,
@@ -286,7 +289,7 @@ button[class*="bg-rose-600"] [class*="text-white"] {
 
 .bloom-lift:hover {
   transform: translateY(-2px);
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.34), 0 0 22px -6px var(--accent-glow);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.38), 0 0 24px -6px var(--accent-glow);
 }
 
 /* =========================================================
@@ -320,7 +323,7 @@ button[class*="bg-rose-600"] [class*="text-white"] {
   line-height: 1.6;
   white-space: normal;
   word-wrap: break-word;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
 }
 
 .bloom-chat-bubble-ai h1,
@@ -356,7 +359,7 @@ button[class*="bg-rose-600"] [class*="text-white"] {
   border-collapse: collapse;
   margin: 0.75rem 0;
   font-size: 0.825rem;
-  background: rgba(15, 23, 42, 0.72);
+  background: rgba(13, 19, 34, 0.78);
   border: 1px solid var(--glass-border);
   border-radius: 0.65rem;
   overflow: hidden;
@@ -391,7 +394,7 @@ button[class*="bg-rose-600"] [class*="text-white"] {
 }
 
 .bloom-chat-bubble-ai code {
-  background: rgba(15, 23, 42, 0.8);
+  background: rgba(13, 19, 34, 0.84);
   padding: 0.15rem 0.4rem;
   border-radius: 0.35rem;
   font-size: 0.85em;
@@ -399,7 +402,7 @@ button[class*="bg-rose-600"] [class*="text-white"] {
 }
 
 .bloom-chat-bubble-ai pre {
-  background: rgba(15, 23, 42, 0.9);
+  background: rgba(13, 19, 34, 0.92);
   border: 1px solid var(--glass-border);
   border-radius: 0.65rem;
   padding: 0.85rem;
@@ -425,12 +428,12 @@ button[class*="bg-rose-600"] [class*="text-white"] {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.25);
+  background: rgba(148, 163, 184, 0.28);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.48);
+  background: rgba(244, 63, 94, 0.5);
 }
 
 @media (prefers-reduced-motion: reduce) {

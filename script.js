@@ -1,4 +1,4 @@
-// BLOOM APPLICATION SCRIPT (2026 EDITION - SUPABASE, GEMINI AI, MULTIMODAL, MULTI-CHAT & FOCUS RADIO)
+// BLOOM APPLICATION SCRIPT (2026 EDITION - SUPABASE, GEMINI AI, GUIDANCE DETAIL, MULTIMODAL, MULTI-CHAT & FOCUS RADIO)
 
 // SUPABASE CONFIGURATION
 const SUPABASE_URL = 'https://xmqmrkqyjnbupyalhnib.supabase.co';
@@ -12,10 +12,6 @@ if (window.mermaid) {
     mermaid.initialize({ startOnLoad: false, theme: 'dark' });
 }
 
-// --- TASK MANAGEMENT WITH SUPABASE (PER-USER ISOLATED) ---
-let tasks = [];
-let currentFilter = 'all';
-
 function escapeHtml(str) {
     return String(str ?? '')
         .replace(/&/g, '&amp;')
@@ -24,6 +20,14 @@ function escapeHtml(str) {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
 }
+
+function escapeJsSingleQuote(str) {
+    return String(str ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+// --- TASK MANAGEMENT WITH SUPABASE (PER-USER ISOLATED) ---
+let tasks = [];
+let currentFilter = 'all';
 
 async function fetchTasks() {
     const { data: { session } } = await supabaseClient.auth.getSession();
@@ -35,7 +39,7 @@ async function fetchTasks() {
             container.innerHTML = `
                 <div class="text-center py-12 bg-slate-900/30 rounded-2xl border border-white/5 space-y-3 bloom-subtle-card">
                     <p class="text-slate-400 text-sm">Please log in to view and manage your personal tasks.</p>
-                    <button onclick="switchTab('auth')" class="px-4 py-2 rounded-xl bg-rose-500 text-white text-xs font-semibold hover:bg-rose-600 transition-colors">
+                    <button type="button" onclick="switchTab('auth')" class="px-4 py-2 rounded-xl bg-rose-500 text-white text-xs font-semibold hover:bg-rose-600 transition-colors">
                         Log In Now
                     </button>
                 </div>
@@ -77,15 +81,16 @@ async function handleAddTask(e) {
 
     if (!titleInput || !priorityInput || !categoryInput) return;
 
+    const cleanTitle = titleInput.value.trim();
+    if (!cleanTitle) return;
+
     const newTask = {
-        title: titleInput.value.trim(),
+        title: cleanTitle,
         priority: priorityInput.value,
         category: categoryInput.value,
         completed: false,
         user_id: session.user.id
     };
-
-    if (!newTask.title) return;
 
     const { error } = await supabaseClient
         .from('tasks')
@@ -168,7 +173,7 @@ async function fetchAiMicroSteps(taskTitle, elementId) {
             || data?.reply
             || "1. Review task details and requirements.\n2. Break it into smaller 10-minute blocks.\n3. Complete the very first small action.";
         const stepsText = cleanModelMarkdown(rawSteps);
-        const escapedTitle = String(taskTitle).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        const escapedTitle = escapeJsSingleQuote(taskTitle);
 
         container.innerHTML = `
             <div class="mt-3 p-3.5 rounded-xl bg-slate-950/90 border border-teal-500/30 text-xs space-y-2 shadow-inner">
@@ -180,7 +185,7 @@ async function fetchAiMicroSteps(taskTitle, elementId) {
                         </span>
                         <span class="text-[10px] font-semibold bg-teal-500/15 text-teal-300 px-2 py-0.5 rounded border border-teal-500/30">Bloom AI</span>
                     </div>
-                    <button onclick="fetchAiMicroSteps('${escapedTitle}', '${elementId}')" class="text-[11px] text-slate-400 hover:text-teal-300 flex items-center gap-1 transition-colors">
+                    <button type="button" onclick="fetchAiMicroSteps('${escapedTitle}', '${elementId}')" class="text-[11px] text-slate-400 hover:text-teal-300 flex items-center gap-1 transition-colors">
                         <i data-lucide="refresh-cw" class="w-3 h-3"></i>
                         <span>Regenerate with AI</span>
                     </button>
@@ -190,11 +195,11 @@ async function fetchAiMicroSteps(taskTitle, elementId) {
         `;
     } catch (err) {
         console.error("Micro-steps error:", err);
-        const escapedTitle = String(taskTitle).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        const escapedTitle = escapeJsSingleQuote(taskTitle);
         container.innerHTML = `
             <div class="mt-2 flex items-center justify-between text-xs text-rose-400">
                 <span>AI Error: ${escapeHtml(err.message)}</span>
-                <button onclick="fetchAiMicroSteps('${escapedTitle}', '${elementId}')" class="underline hover:text-rose-300">Retry</button>
+                <button type="button" onclick="fetchAiMicroSteps('${escapedTitle}', '${elementId}')" class="underline hover:text-rose-300">Retry</button>
             </div>
         `;
     }
@@ -234,12 +239,12 @@ function renderTasks() {
     };
 
     container.innerHTML = filtered.map(t => {
-        const escapedTitle = String(t.title).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        const escapedTitle = escapeJsSingleQuote(t.title);
         return `
         <div class="p-4 rounded-2xl bg-slate-900/80 border ${t.completed ? 'border-slate-800 opacity-60' : 'border-white/10'} transition-all hover:border-white/20 bloom-subtle-card">
             <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-3">
-                    <button onclick="toggleTask(${t.id})" class="p-1 rounded-lg ${t.completed ? 'bg-rose-500 text-white' : 'border border-slate-600 hover:border-rose-400'}">
+                    <button type="button" onclick="toggleTask(${t.id})" class="p-1 rounded-lg ${t.completed ? 'bg-rose-500 text-white' : 'border border-slate-600 hover:border-rose-400'}">
                         <i data-lucide="${t.completed ? 'check-square' : 'square'}" class="w-5 h-5"></i>
                     </button>
                     <div>
@@ -249,13 +254,13 @@ function renderTasks() {
                 </div>
                 <div class="flex items-center space-x-3">
                     ${priorityBadges[t.priority] || priorityBadges.medium}
-                    <button onclick="deleteTask(${t.id})" class="text-slate-500 hover:text-red-400 p-1">
+                    <button type="button" onclick="deleteTask(${t.id})" class="text-slate-500 hover:text-red-400 p-1">
                         <i data-lucide="trash-2" class="w-4 h-4"></i>
                     </button>
                 </div>
             </div>
             <div id="ai-steps-${t.id}" class="mt-2 pt-2 border-t border-white/5">
-                <button onclick="fetchAiMicroSteps('${escapedTitle}', 'ai-steps-${t.id}')" class="text-xs text-teal-400 hover:text-teal-300 font-medium flex items-center gap-1.5 transition-colors">
+                <button type="button" onclick="fetchAiMicroSteps('${escapedTitle}', 'ai-steps-${t.id}')" class="text-xs text-teal-400 hover:text-teal-300 font-medium flex items-center gap-1.5 transition-colors">
                     <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
                     <span>Generate BloomAI Micro-Steps</span>
                 </button>
@@ -297,7 +302,7 @@ setInterval(rotateQuotes, 30000);
 
 // TAB NAVIGATION SYSTEM
 function switchTab(tabId) {
-    const tabs = ['auth', 'home', 'tasks', 'learn', 'chat'];
+    const tabs = ['auth', 'home', 'tasks', 'learn', 'guide-detail', 'chat'];
     tabs.forEach(t => {
         const view = document.getElementById(`view-${t}`);
         const navBtn = document.getElementById(`nav-${t}`);
@@ -337,44 +342,75 @@ function switchTab(tabId) {
     if (window.lucide) lucide.createIcons();
 }
 
-// LEARNING PLATFORM DATA & SWITCHER
+// --- GUIDANCE LIBRARY WITH TOPIC DETAIL, VIDEO, M4A PODCAST, TRANSCRIPT & BLOOM AI ---
+const GUIDE_STORAGE_BUCKET = 'guidance-media';
+let activeGuideTopic = null;
+
+function getSupabasePublicFileUrl(filePath) {
+    if (!filePath) return '';
+    if (/^https?:\/\//i.test(filePath)) return filePath;
+    const { data } = supabaseClient.storage.from(GUIDE_STORAGE_BUCKET).getPublicUrl(filePath);
+    return data?.publicUrl || '';
+}
+
 const learningData = {
     career: [
         {
+            id: 'balancing-high-school-late-night-shifts',
             title: 'Balancing High School & Late Night Shifts',
-            desc: 'Practical strategies to communicate with managers about homework deadlines and avoid shift burnout.',
-            type: 'Article • 4 min read'
+            desc: 'Practical strategies to communicate with managers about homework deadlines, protect sleep, and avoid shift burnout.',
+            type: 'Article + Video + Podcast • 4 min read',
+            videoPath: 'videos/balancing-high-school-late-night-shifts.mp4',
+            podcastPath: 'podcasts/balancing-high-school-late-night-shifts.m4a',
+            transcriptPath: 'transcripts/balancing-high-school-late-night-shifts.txt',
+            transcriptText: `Paste your full transcript text here so it shows immediately even before uploading the .txt file to Supabase Storage.`,
+            bloomPrompt: `Walk me through "Balancing High School & Late Night Shifts" in a warm, conversational way. Break down realistic habits for handling schoolwork, late shifts, and energy without burning out, and ask how it fits my week.`
         },
         {
+            id: 'resume-zero-experience',
             title: 'Building a Resume with Zero Prior Experience',
             desc: 'How to frame coursework, self-taught tech projects, and resilience into top job applications.',
-            type: 'Guide • 6 min read'
+            type: 'Guide • 6 min read',
+            transcriptText: 'Guide notes on turning projects, schoolwork, and consistency into strong resume bullet points.',
+            bloomPrompt: 'Help me turn my real projects, schoolwork, and everyday experience into strong resume bullet points in a friendly, conversational way.'
         }
     ],
     emotional: [
         {
+            id: 'adult-counselors-disconnect',
             title: 'Why Adult Counselors Feel Disconnected & What To Do',
             desc: 'Understanding generational advice gaps and taking ownership of your self-care journey.',
-            type: 'Perspective • 5 min read'
+            type: 'Perspective • 5 min read',
+            transcriptText: 'Perspective guide on finding support that actually fits where you are right now.',
+            bloomPrompt: 'Talk through how to get practical support and stay grounded when advice feels disconnected from real life.'
         },
         {
+            id: 'late-night-overthinking',
             title: 'Overcoming Late-Night Overthinking',
             desc: 'Actionable cognitive exercises when anxiety keeps you up past 2:00 AM.',
-            type: 'Mental Health • 3 min read'
+            type: 'Mental Health • 3 min read',
+            transcriptText: 'Simple wind-down steps to quiet racing thoughts late at night.',
+            bloomPrompt: 'Help me wind down racing thoughts late at night with calm, practical steps.'
         }
     ],
     personal: [
         {
+            id: 'five-minute-rule',
             title: 'The 5-Minute Rule Against Procrastination',
             desc: 'Trick your brain into starting tasks without feeling overwhelmed by big projects.',
-            type: 'Habit Builder • 3 min read'
+            type: 'Habit Builder • 3 min read',
+            transcriptText: 'Start with just five minutes of low-pressure action to build momentum.',
+            bloomPrompt: 'Help me use the 5-minute rule to get started on something I have been putting off.'
         }
     ],
     destress: [
         {
+            id: 'breathing-478',
             title: '4-7-8 Breathing Technique',
             desc: 'Inhale for 4s, hold for 7s, exhale for 8s to instantly lower heart rate.',
-            type: 'Interactive Exercise'
+            type: 'Interactive Exercise',
+            transcriptText: 'Inhale quietly through your nose for 4 seconds, hold for 7 seconds, and exhale completely for 8 seconds.',
+            bloomPrompt: 'Guide me through a calm 4-7-8 breathing reset and help me decompress.'
         }
     ]
 };
@@ -402,11 +438,144 @@ function switchCategory(cat) {
                 <h3 class="text-lg font-bold text-white mt-2 mb-2">${escapeHtml(item.title)}</h3>
                 <p class="text-slate-400 text-sm leading-relaxed mb-4">${escapeHtml(item.desc)}</p>
             </div>
-            <button onclick="switchTab('chat')" class="w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-semibold transition-colors">
-                Discuss with Bloom AI
+            <button type="button" onclick="openGuideTopic('${escapeJsSingleQuote(cat)}', '${escapeJsSingleQuote(item.id)}')" class="w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-semibold transition-colors">
+                Open Topic Guide
             </button>
         </div>
     `).join('');
+}
+
+async function openGuideTopic(categoryKey, topicId) {
+    const topic = (learningData[categoryKey] || []).find(item => item.id === topicId);
+    if (!topic) return;
+
+    activeGuideTopic = topic;
+
+    const tabs = ['auth', 'home', 'tasks', 'learn', 'guide-detail', 'chat'];
+    tabs.forEach(t => {
+        const view = document.getElementById(`view-${t}`);
+        if (view) view.classList.add('hidden');
+    });
+
+    const detailView = document.getElementById('view-guide-detail');
+    if (detailView) detailView.classList.remove('hidden');
+
+    const titleEl = document.getElementById('guide-detail-title');
+    const descEl = document.getElementById('guide-detail-desc');
+    const badgeEl = document.getElementById('guide-detail-badge');
+    const videoEl = document.getElementById('guide-video-player');
+    const videoDlEl = document.getElementById('guide-video-download');
+    const audioEl = document.getElementById('guide-audio-player');
+    const transcriptBox = document.getElementById('guide-transcript-box');
+
+    if (titleEl) titleEl.textContent = topic.title;
+    if (descEl) descEl.textContent = topic.desc;
+    if (badgeEl) badgeEl.textContent = topic.type;
+
+    const videoUrl = getSupabasePublicFileUrl(topic.videoPath);
+    if (videoEl) {
+        videoEl.src = videoUrl;
+        videoEl.load();
+    }
+    if (videoDlEl) {
+        videoDlEl.href = videoUrl || '#';
+    }
+
+    const audioUrl = getSupabasePublicFileUrl(topic.podcastPath);
+    if (audioEl) {
+        audioEl.src = audioUrl;
+        audioEl.load();
+    }
+
+    let resolvedTranscript = topic.transcriptText || '';
+    if (topic.transcriptPath) {
+        try {
+            const txUrl = getSupabasePublicFileUrl(topic.transcriptPath);
+            if (txUrl) {
+                const resp = await fetch(txUrl);
+                if (resp.ok) {
+                    const remoteText = await resp.text();
+                    if (remoteText.trim()) resolvedTranscript = remoteText.trim();
+                }
+            }
+        } catch (err) {
+            console.warn('Using local fallback transcript:', err);
+        }
+    }
+
+    topic.resolvedTranscript = resolvedTranscript;
+    if (transcriptBox) {
+        transcriptBox.textContent = resolvedTranscript || 'Transcript coming soon.';
+    }
+
+    if (window.lucide) lucide.createIcons();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function triggerFileDownload(url, fallbackText, filename) {
+    try {
+        if (url && /^https?:\/\//i.test(url)) {
+            const response = await fetch(url);
+            if (response.ok) {
+                const blob = await response.blob();
+                const blobUrl = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = blobUrl;
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 1500);
+                return;
+            }
+        }
+    } catch (err) {
+        console.warn('Direct fetch download fallback:', err);
+    }
+
+    if (fallbackText) {
+        const blob = new Blob([fallbackText], { type: 'text/plain;charset=utf-8' });
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 1500);
+    }
+}
+
+async function downloadActiveGuidePodcast() {
+    if (!activeGuideTopic) return;
+    const audioUrl = getSupabasePublicFileUrl(activeGuideTopic.podcastPath);
+    await triggerFileDownload(audioUrl, null, `${activeGuideTopic.id}.m4a`);
+}
+
+async function downloadActiveGuideTranscript() {
+    if (!activeGuideTopic) return;
+    const txUrl = getSupabasePublicFileUrl(activeGuideTopic.transcriptPath);
+    await triggerFileDownload(txUrl, activeGuideTopic.resolvedTranscript || activeGuideTopic.transcriptText || '', `${activeGuideTopic.id}-transcript.txt`);
+}
+
+function explainActiveGuideWithBloomAI() {
+    if (!activeGuideTopic) {
+        switchTab('chat');
+        return;
+    }
+
+    const transcriptSnippet = (activeGuideTopic.resolvedTranscript || activeGuideTopic.transcriptText || '').slice(0, 3500);
+    const basePrompt = activeGuideTopic.bloomPrompt || `Explain "${activeGuideTopic.title}" in a warm, conversational way.`;
+    const fullPrompt = transcriptSnippet
+        ? `${basePrompt}\n\nTranscript context:\n${transcriptSnippet}`
+        : basePrompt;
+
+    switchTab('chat');
+    const input = document.getElementById('chat-input');
+    if (input) {
+        input.value = fullPrompt;
+        input.focus();
+    }
 }
 
 // --- MULTIMODAL FILE ATTACHMENTS (WITH FAST IMAGE COMPRESSION) & VOICE INPUT ---
@@ -592,11 +761,8 @@ function cleanModelMarkdown(rawText) {
         return token;
     });
 
-    // Remove empty [] tokens or standalone broken bracket pairs
     text = text.replace(/\[\s*\]/g, '');
-    // Collapse 3+ consecutive asterisks outside emphasis runs into a clean bullet or divider
     text = text.replace(/\*{4,}/g, '**');
-    // Clean orphaned leading/trailing asterisks attached to plain words like ***word***
     text = text.replace(/(?<!\*)\*\*\*([^\n*]+?)\*\*\*(?!\*)/g, '**$1**');
 
     codeFences.forEach((block, idx) => {
@@ -684,7 +850,7 @@ async function loadChatSessions() {
             chatContainer.innerHTML = `
                 <div class="text-center py-12 space-y-3">
                     <p class="text-slate-400 text-sm">Please log in to chat with Bloom AI.</p>
-                    <button onclick="switchTab('auth')" class="px-4 py-2 rounded-xl bg-rose-500 text-white text-xs font-semibold hover:bg-rose-600 transition-colors">
+                    <button type="button" onclick="switchTab('auth')" class="px-4 py-2 rounded-xl bg-rose-500 text-white text-xs font-semibold hover:bg-rose-600 transition-colors">
                         Log In Now
                     </button>
                 </div>
@@ -723,9 +889,9 @@ function renderChatSessionsList() {
     }
 
     listContainer.innerHTML = chatSessions.map(s => `
-        <div onclick="selectChatSession('${s.id}')" class="group flex items-center justify-between p-2.5 rounded-xl text-xs font-medium cursor-pointer transition-all ${s.id === currentSessionId ? 'bg-rose-500/20 border border-rose-500/40 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'}">
+        <div onclick="selectChatSession('${escapeJsSingleQuote(s.id)}')" class="group flex items-center justify-between p-2.5 rounded-xl text-xs font-medium cursor-pointer transition-all ${s.id === currentSessionId ? 'bg-rose-500/20 border border-rose-500/40 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'}">
             <span class="truncate max-w-[160px]">${escapeHtml(s.title)}</span>
-            <button onclick="deleteChatSession(event, '${s.id}')" class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-rose-400 p-1 transition-opacity" title="Delete chat">
+            <button type="button" onclick="deleteChatSession(event, '${escapeJsSingleQuote(s.id)}')" class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-rose-400 p-1 transition-opacity" title="Delete chat">
                 <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
             </button>
         </div>

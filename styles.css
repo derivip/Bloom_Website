@@ -13,9 +13,78 @@
     background-size: 400% 400%;
     animation: gradientShift 15s ease infinite;
 }
+:root {
+  --bg-base: #0d111d;
+  --accent-a: rgba(244, 63, 94, 0.22);
+  --accent-b: rgba(56, 189, 248, 0.18);
+  --accent-c: rgba(168, 85, 247, 0.16);
+  --surface-glass: rgba(19, 27, 46, 0.72);
+  --surface-border: rgba(255, 255, 255, 0.12);
+}
 
+body {
+  position: relative;
+  min-height: 100dvh;
+  margin: 0;
+  background-color: var(--bg-base);
+  overflow-x: clip;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: -20%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 20% 25%, var(--accent-a), transparent 45%),
+    radial-gradient(circle at 80% 30%, var(--accent-b), transparent 50%),
+    radial-gradient(circle at 50% 85%, var(--accent-c), transparent 55%);
+  filter: blur(48px);
+  animation: bloomAmbientShift 18s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+@keyframes bloomAmbientShift {
+  0% {
+    transform: translate3d(-2%, -2%, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(2%, 1.5%, 0) scale(1.06);
+  }
+  100% {
+    transform: translate3d(-1%, 2.5%, 0) scale(1.03);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before {
+    animation: none;
+  }
+}
 @keyframes gradientShift {
     0% { background-position: 0% 50%; }
     50% { background-position: 100% 50%; }
     100% { background-position: 0% 50%; }
+}
+.bloom-chat-shell {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: 100%;
+  max-width: none;
+  height: 100dvh;
+  min-height: 100dvh;
+  background: var(--surface-glass);
+  backdrop-filter: blur(16px);
+}
+
+.bloom-chat-messages {
+  overflow-y: auto;
+  min-height: 0;
+  padding: 1rem 1.25rem;
+  scroll-behavior: smooth;
+}
+
+.bloom-chat-bubble-ai {
+  max-width: min(88ch, 92%);
 }

@@ -361,7 +361,7 @@ const learningData = {
             desc: 'Practical strategies to communicate with managers about homework deadlines, protect sleep, and avoid shift burnout.',
             type: 'Article + Video + Podcast • 4 min read',
            videoPath: 'videos/balancing-high-school-late-shifts.mp4.mp4',
-            podcastPath: 'podcasts/balancing-high-school-late-shifts.m4a.m4a',
+            podcastPath: 'https://xmqmrkqyjnbupyalhnib.supabase.co/storage/v1/object/public/guidance_media/podcasts/balancing-high-school-late-shifts.m4a.m4a',
         transcriptPath: 'videos/Studying With a Job_Transcript.txt', // <-- Match the exact full filename in your bucket root!
             bloomPrompt: `Walk me through "Balancing High School & Late Night Shifts" in a warm, conversational way. Break down realistic habits for handling schoolwork, late shifts, and energy without burning out, and ask how it fits my week.`
         },

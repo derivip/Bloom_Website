@@ -4,7 +4,7 @@ const SUPABASE_URL = 'https://xmqmrkqyjnbupyalhnib.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_7AqK322TINFq1y39lMgvTw_Z7Itc79G';
 
 // Replace with your real Google Cloud Web Client ID when ready
-const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = '791171042182-4l9e9vjt3t9p2aa7p3bubc50s4pr3an7.apps.googleusercontent.com';
 const GOOGLE_CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
 let googleAccessToken = null;
 

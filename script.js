@@ -217,7 +217,7 @@ function filterTasks(priority) {
     renderTasks();
 }
 
-// --- GOOGLE CALENDAR SYNC (DIRECT API WHEN OAUTH SET, OR QUICK CALENDAR LINK FALLBACK) ---
+// --- GOOGLE CALENDAR SYNC ---
 function getDefaultEventWindow() {
     const start = new Date();
     start.setMinutes(0, 0, 0);
@@ -318,7 +318,6 @@ async function syncTaskToGoogleCalendar(id) {
             `;
         }
     } catch (_err) {
-        // Fallback so clicking Sync to Calendar still gets the event into Google Calendar smoothly
         window.open(webCalUrl, '_blank', 'noopener,noreferrer');
         if (statusEl) {
             statusEl.innerHTML = `

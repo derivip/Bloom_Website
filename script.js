@@ -1,8 +1,13 @@
-// BLOOM APPLICATION SCRIPT (2026 EDITION - SUPABASE, GEMINI AI, GUIDANCE DETAIL, MULTIMODAL, MULTI-CHAT & FOCUS RADIO)
+// BLOOM APPLICATION SCRIPT (2026 EDITION - SUPABASE, GEMINI AI, GUIDANCE DETAIL, MULTIMODAL, MULTI-CHAT, FOCUS RADIO & GOOGLE CALENDAR SYNC)
 
 // SUPABASE CONFIGURATION
 const SUPABASE_URL = 'https://xmqmrkqyjnbupyalhnib.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_7AqK322TINFq1y39lMgvTw_Z7Itc79G';
+
+// GOOGLE CALENDAR OAUTH 2.0 CONFIGURATION (Replace with your Web Client ID from Google Cloud Console)
+const GOOGLE_CLIENT_ID = '791171042182-4l9e9vjt3t9p2aa7p3bubc50s4pr3an7.apps.googleusercontent.com';
+const GOOGLE_CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+let googleAccessToken = null;
 
 // Initialize Supabase Client
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -107,7 +112,7 @@ async function handleAddTask(e) {
 }
 
 async function toggleTask(id) {
-    const taskToToggle = tasks.find(t => t.id === id);
+    const taskToToggle = tasks.find(t => String(t.id) === String(id));
     if (!taskToToggle) return;
 
     const { error } = await supabaseClient
@@ -151,6 +156,121 @@ function filterTasks(priority) {
     renderTasks();
 }
 
+// --- GOOGLE CALENDAR OAUTH 2.0 + REST API FOR FOCUS TASKS ---
+function requestGoogleCalendarAccessToken() {
+    return new Promise((resolve, reject) => {
+        if (!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.startsWith('YOUR_GOOGLE_OAUTH_CLIENT_ID')) {
+            reject(new Error('Set your GOOGLE_CLIENT_ID in script.js from Google Cloud Console.'));
+            return;
+        }
+        if (!window.google?.accounts?.oauth2) {
+            reject(new Error('Google Identity Services did not load yet. Refresh and try again.'));
+            return;
+        }
+
+        const tokenClient = window.google.accounts.oauth2.initTokenClient({
+            client_id: GOOGLE_CLIENT_ID,
+            scope: GOOGLE_CALENDAR_SCOPE,
+            callback: (resp) => {
+                if (resp.error) {
+                    reject(new Error(resp.error_description || resp.error));
+                    return;
+                }
+                googleAccessToken = resp.access_token;
+                resolve(googleAccessToken);
+            }
+        });
+
+        tokenClient.requestAccessToken({ prompt: googleAccessToken ? '' : 'consent' });
+    });
+}
+
+async function syncTaskToGoogleCalendar(id) {
+    const task = tasks.find(t => String(t.id) === String(id));
+    if (!task) return;
+
+    const statusEl = document.getElementById(`gcal-status-${id}`);
+
+    try {
+        if (statusEl) {
+            statusEl.innerHTML = `<span class="text-[11px] text-sky-300 animate-pulse">Connecting to Google Calendar...</span>`;
+        }
+
+        const token = googleAccessToken || (await requestGoogleCalendarAccessToken());
+
+        const start = new Date();
+        start.setMinutes(0, 0, 0);
+        start.setHours(start.getHours() + 1);
+        const end = new Date(start.getTime() + 45 * 60 * 1000);
+        const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
+        const response = await fetch(
+            'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+            {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    summary: `Bloom Focus: ${task.title}`,
+                    description: `Category: ${task.category || 'Personal'} | Priority: ${(task.priority || 'medium').toUpperCase()}`,
+                    start: { dateTime: start.toISOString(), timeZone },
+                    end: { dateTime: end.toISOString(), timeZone }
+                })
+            }
+        );
+
+        if (response.status === 401) {
+            googleAccessToken = null;
+            return syncTaskToGoogleCalendar(id);
+        }
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.error?.message || `HTTP ${response.status}`);
+        }
+
+        const createdEvent = await response.json();
+        task.syncedToCalendar = true;
+
+        if (statusEl) {
+            statusEl.innerHTML = `
+                <div class="flex items-center justify-between gap-2 text-[11px] text-emerald-300 mt-1.5">
+                    <span>Added to Google Calendar (${start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })})</span>
+                    ${
+                        createdEvent.htmlLink
+                            ? `<a href="${escapeHtml(createdEvent.htmlLink)}" target="_blank" rel="noopener noreferrer" class="underline hover:text-emerald-200">View Event</a>`
+                            : ''
+                    }
+                </div>
+            `;
+        }
+    } catch (err) {
+        console.error('Google Calendar sync failed:', err);
+        if (statusEl) {
+            statusEl.innerHTML = `<div class="text-[11px] text-rose-300 mt-1.5">Calendar sync failed: ${escapeHtml(err.message)}</div>`;
+        } else {
+            alert(`Google Calendar sync failed: ${err.message}`);
+        }
+    }
+}
+
+function askBloomForTaskHelp(taskTitle, stepsElementId) {
+    const stepsBox = document.getElementById(stepsElementId);
+    const stepsText = stepsBox ? stepsBox.innerText.trim() : '';
+    const prompt = stepsText
+        ? `I'm working on "${taskTitle}" and generated these steps:\n${stepsText}\n\nCan you give me more help, practical tips, or walk me through the first step?`
+        : `Can you help me break down and get started on "${taskTitle}"?`;
+
+    switchTab('chat');
+    const input = document.getElementById('chat-input');
+    if (input) {
+        input.value = prompt;
+        input.focus();
+    }
+}
+
 // --- GEMINI AI MICRO-STEPS FOR TASKS ---
 async function fetchAiMicroSteps(taskTitle, elementId) {
     const container = document.getElementById(elementId);
@@ -185,10 +305,16 @@ async function fetchAiMicroSteps(taskTitle, elementId) {
                         </span>
                         <span class="text-[10px] font-semibold bg-teal-500/15 text-teal-300 px-2 py-0.5 rounded border border-teal-500/30">Bloom AI</span>
                     </div>
-                    <button type="button" onclick="fetchAiMicroSteps('${escapedTitle}', '${elementId}')" class="text-[11px] text-slate-400 hover:text-teal-300 flex items-center gap-1 transition-colors">
-                        <i data-lucide="refresh-cw" class="w-3 h-3"></i>
-                        <span>Regenerate with AI</span>
-                    </button>
+                    <div class="flex items-center gap-3">
+                        <button type="button" onclick="askBloomForTaskHelp('${escapedTitle}', '${elementId}')" class="text-[11px] text-rose-300 hover:text-rose-200 font-semibold flex items-center gap-1 transition-colors">
+                            <i data-lucide="bot" class="w-3 h-3"></i>
+                            <span>Ask Bloom AI for more help</span>
+                        </button>
+                        <button type="button" onclick="fetchAiMicroSteps('${escapedTitle}', '${elementId}')" class="text-[11px] text-slate-400 hover:text-teal-300 flex items-center gap-1 transition-colors">
+                            <i data-lucide="refresh-cw" class="w-3 h-3"></i>
+                            <span>Regenerate with AI</span>
+                        </button>
+                    </div>
                 </div>
                 <div class="text-slate-200 leading-relaxed whitespace-pre-line">${escapeHtml(stepsText)}</div>
             </div>
@@ -240,25 +366,31 @@ function renderTasks() {
 
     container.innerHTML = filtered.map(t => {
         const escapedTitle = escapeJsSingleQuote(t.title);
+        const escapedId = escapeJsSingleQuote(String(t.id));
         return `
         <div class="p-4 rounded-2xl bg-slate-900/80 border ${t.completed ? 'border-slate-800 opacity-60' : 'border-white/10'} transition-all hover:border-white/20 bloom-subtle-card">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-3">
-                    <button type="button" onclick="toggleTask(${t.id})" class="p-1 rounded-lg ${t.completed ? 'bg-rose-500 text-white' : 'border border-slate-600 hover:border-rose-400'}">
+            <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center space-x-3 min-w-0">
+                    <button type="button" onclick="toggleTask('${escapedId}')" class="p-1 rounded-lg shrink-0 ${t.completed ? 'bg-rose-500 text-white' : 'border border-slate-600 hover:border-rose-400'}">
                         <i data-lucide="${t.completed ? 'check-square' : 'square'}" class="w-5 h-5"></i>
                     </button>
-                    <div>
-                        <p class="text-sm font-semibold text-white ${t.completed ? 'line-through text-slate-500' : ''}">${escapeHtml(t.title)}</p>
+                    <div class="min-w-0">
+                        <p class="text-sm font-semibold text-white truncate ${t.completed ? 'line-through text-slate-500' : ''}">${escapeHtml(t.title)}</p>
                         <span class="text-xs text-slate-400">${escapeHtml(t.category)}</span>
                     </div>
                 </div>
-                <div class="flex items-center space-x-3">
+                <div class="flex items-center space-x-2 shrink-0">
+                    <button type="button" onclick="syncTaskToGoogleCalendar('${escapedId}')" class="px-2.5 py-1 rounded-lg bg-sky-500/15 hover:bg-sky-500/25 border border-sky-400/30 text-sky-200 text-[11px] font-semibold flex items-center gap-1 transition-colors" title="Sync task to Google Calendar">
+                        <i data-lucide="calendar-plus" class="w-3.5 h-3.5"></i>
+                        <span class="hidden sm:inline">Sync to Calendar</span>
+                    </button>
                     ${priorityBadges[t.priority] || priorityBadges.medium}
-                    <button type="button" onclick="deleteTask(${t.id})" class="text-slate-500 hover:text-red-400 p-1">
+                    <button type="button" onclick="deleteTask('${escapedId}')" class="text-slate-500 hover:text-red-400 p-1">
                         <i data-lucide="trash-2" class="w-4 h-4"></i>
                     </button>
                 </div>
             </div>
+            <div id="gcal-status-${t.id}"></div>
             <div id="ai-steps-${t.id}" class="mt-2 pt-2 border-t border-white/5">
                 <button type="button" onclick="fetchAiMicroSteps('${escapedTitle}', 'ai-steps-${t.id}')" class="text-xs text-teal-400 hover:text-teal-300 font-medium flex items-center gap-1.5 transition-colors">
                     <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
@@ -360,9 +492,9 @@ const learningData = {
             title: 'Balancing High School & Late Night Shifts',
             desc: 'Practical strategies to communicate with managers about homework deadlines, protect sleep, and avoid shift burnout.',
             type: 'Article + Video + Podcast • 4 min read',
-           videoPath: 'videos/balancing-high-school-late-shifts.mp4.mp4',
-            podcastPath: 'https://xmqmrkqyjnbupyalhnib.supabase.co/storage/v1/object/public/guidance_media/podcasts/balancing-high-school-late-shifts.m4a.m4a',
-        transcriptPath: 'videos/Studying With a Job_Transcript.txt', // <-- Match the exact full filename in your bucket root!
+            videoPath: 'videos/balancing-high-school-late-night-shifts.mp4.mp4',
+            podcastPath: 'https://xmqmrkqyjnbupyalhnib.supabase.co/storage/v1/object/public/guidance_media/podcasts/balancing-high-school-late-night-shifts.m4a.m4a',
+            transcriptPath: 'videos/Studying With a Job_Transcript.txt',
             bloomPrompt: `Walk me through "Balancing High School & Late Night Shifts" in a warm, conversational way. Break down realistic habits for handling schoolwork, late shifts, and energy without burning out, and ask how it fits my week.`
         },
         {
@@ -748,7 +880,6 @@ function stopVoiceUI() {
     if (input) input.placeholder = "Ask Bloom anything...";
 }
 
-// Clean stray model bracket/asterisk artifacts outside code fences & tables
 function cleanModelMarkdown(rawText) {
     let text = String(rawText ?? '').trim();
     if (!text) return '';
@@ -794,66 +925,41 @@ function formatAiMessageContent(rawText) {
     try {
         html = window.marked
             ? marked.parse(processedText, { breaks: true, gfm: true })
-            : escapeHtml(processedText).replace(/\n/g, '<br>');
+            : `<p>${escapeHtml(processedText).replace(/\n/g, '<br>')}</p>`;
     } catch {
-        html = escapeHtml(processedText).replace(/\n/g, '<br>');
+        html = `<p>${escapeHtml(processedText).replace(/\n/g, '<br>')}</p>`;
     }
 
-    html = html
-        .replace(/<table>/g, '<div class="my-3 overflow-x-auto rounded-xl border border-white/10"><table class="w-full text-left text-xs border-collapse">')
-        .replace(/<\/table>/g, '</table></div>')
-        .replace(/<thead>/g, '<thead class="bg-slate-900/90 text-rose-300 uppercase text-[11px]">')
-        .replace(/<th>/g, '<th class="p-2.5 border-b border-white/10 font-semibold whitespace-nowrap">')
-        .replace(/<td>/g, '<td class="p-2.5 border-b border-white/5 text-slate-200 align-top">')
-        .replace(/<h1>/g, '<h1 class="text-lg font-bold text-white mt-3 mb-1.5">')
-        .replace(/<h2>/g, '<h2 class="text-base font-bold text-rose-300 mt-3 mb-1.5">')
-        .replace(/<h3>/g, '<h3 class="text-sm font-bold text-white mt-2.5 mb-1">')
-        .replace(/<ul>/g, '<ul class="list-disc pl-5 my-2 space-y-1">')
-        .replace(/<ol>/g, '<ol class="list-decimal pl-5 my-2 space-y-1">')
-        .replace(/<p>/g, '<p class="mb-2 last:mb-0">');
-
-    mermaidBlocks.forEach((block, i) => {
-        html = html.replace(`%%MERMAID_BLOCK_${i}%%`, block);
+    mermaidBlocks.forEach((block, idx) => {
+        html = html.replace(`%%MERMAID_BLOCK_${idx}%%`, block);
     });
 
     return html;
 }
 
-async function renderDiagramsInChat() {
-    if (window.mermaid) {
-        try {
-            await mermaid.run({ querySelector: '#chat-messages .mermaid' });
-        } catch (err) {
-            console.warn("Diagram render warning:", err);
-        }
-    }
-}
-
-// --- EXPLORE BLOOM AI MULTI-CHAT SYSTEM ---
-let currentSessionId = null;
+// --- MULTI-CHAT SESSIONS WITH SUPABASE ---
+let activeChatSessionId = null;
 let chatSessions = [];
-let isSendingMessage = false;
 
 async function loadChatSessions() {
     const { data: { session } } = await supabaseClient.auth.getSession();
     const listContainer = document.getElementById('chat-sessions-list');
-    const chatContainer = document.getElementById('chat-messages');
+    const chatBox = document.getElementById('chat-messages');
 
     if (!session) {
-        chatSessions = [];
-        currentSessionId = null;
-        if (listContainer) {
-            listContainer.innerHTML = `<p class="text-xs text-slate-400 p-2">Log in to save and switch between chats.</p>`;
-        }
-        if (chatContainer) {
-            chatContainer.innerHTML = `
-                <div class="text-center py-12 space-y-3">
-                    <p class="text-slate-400 text-sm">Please log in to chat with Bloom AI.</p>
-                    <button type="button" onclick="switchTab('auth')" class="px-4 py-2 rounded-xl bg-rose-500 text-white text-xs font-semibold hover:bg-rose-600 transition-colors">
-                        Log In Now
-                    </button>
+        if (listContainer) listContainer.innerHTML = `<p class="text-xs text-slate-500 p-2 text-center">Sign in to save chat history</p>`;
+        if (chatBox) {
+            chatBox.innerHTML = `
+                <div class="flex items-start space-x-3">
+                    <div class="w-8 h-8 rounded-full bg-rose-500/20 flex items-center justify-center border border-rose-500/40 shrink-0">
+                        <i data-lucide="bot" class="w-4 h-4 text-rose-400"></i>
+                    </div>
+                    <div class="p-4 rounded-2xl rounded-tl-sm bg-slate-900 border border-white/10 text-sm text-slate-200 max-w-[85%] bloom-chat-bubble-ai">
+                        Hey! I'm BloomAI. You can chat with me right now, or log in to save multiple chat threads across devices.
+                    </div>
                 </div>
             `;
+            if (window.lucide) lucide.createIcons();
         }
         return;
     }
@@ -864,16 +970,20 @@ async function loadChatSessions() {
         .order('created_at', { ascending: false });
 
     if (error) {
-        console.error("Error loading chat sessions:", error);
+        console.error('Error loading chat sessions:', error);
         return;
     }
 
     chatSessions = data || [];
     renderChatSessionsList();
 
-    if (chatSessions.length > 0 && !currentSessionId) {
-        selectChatSession(chatSessions[0].id);
-    } else if (chatSessions.length === 0) {
+    if (chatSessions.length > 0) {
+        if (!activeChatSessionId || !chatSessions.some(s => s.id === activeChatSessionId)) {
+            await selectChatSession(chatSessions[0].id);
+        } else {
+            await selectChatSession(activeChatSessionId);
+        }
+    } else {
         await createNewChatSession();
     }
 }
@@ -883,453 +993,494 @@ function renderChatSessionsList() {
     if (!listContainer) return;
 
     if (chatSessions.length === 0) {
-        listContainer.innerHTML = `<p class="text-xs text-slate-500 px-2 py-1">No chats yet.</p>`;
+        listContainer.innerHTML = `<p class="text-xs text-slate-500 p-2 text-center">No chats yet.</p>`;
         return;
     }
 
-    listContainer.innerHTML = chatSessions.map(s => `
-        <div onclick="selectChatSession('${escapeJsSingleQuote(s.id)}')" class="group flex items-center justify-between p-2.5 rounded-xl text-xs font-medium cursor-pointer transition-all ${s.id === currentSessionId ? 'bg-rose-500/20 border border-rose-500/40 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'}">
-            <span class="truncate max-w-[160px]">${escapeHtml(s.title)}</span>
-            <button type="button" onclick="deleteChatSession(event, '${escapeJsSingleQuote(s.id)}')" class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-rose-400 p-1 transition-opacity" title="Delete chat">
-                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-            </button>
-        </div>
-    `).join('');
+    listContainer.innerHTML = chatSessions.map(s => {
+        const isActive = s.id === activeChatSessionId;
+        const safeTitle = escapeHtml(s.title || 'New Chat');
+        return `
+            <div class="group flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-colors ${isActive ? 'bg-rose-500/20 border border-rose-500/40 text-white' : 'hover:bg-white/5 text-slate-400 border border-transparent'}" onclick="selectChatSession('${s.id}')">
+                <div class="flex items-center gap-2 truncate pr-1 flex-1">
+                    <i data-lucide="message-square" class="w-3.5 h-3.5 shrink-0 ${isActive ? 'text-rose-400' : 'text-slate-500'}"></i>
+                    <span class="text-xs font-medium truncate">${safeTitle}</span>
+                </div>
+                <button type="button" onclick="event.stopPropagation(); deleteChatSession('${s.id}')" class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 p-1 rounded transition-opacity" title="Delete chat">
+                    <i data-lucide="trash-2" class="w-3 h-3"></i>
+                </button>
+            </div>
+        `;
+    }).join('');
     if (window.lucide) lucide.createIcons();
 }
 
 async function createNewChatSession() {
     const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session) {
-        alert("Please log in to create a chat.");
-        switchTab('auth');
-        return;
-    }
+    if (!session) return;
 
     const { data, error } = await supabaseClient
         .from('chat_sessions')
-        .insert([{ user_id: session.user.id, title: 'New Conversation' }])
+        .insert([{ title: 'New Chat', user_id: session.user.id }])
         .select()
         .single();
 
     if (error) {
-        console.error("Error creating session:", error);
+        console.error('Error creating chat session:', error);
         return;
     }
 
+    activeChatSessionId = data.id;
     chatSessions.unshift(data);
-    selectChatSession(data.id);
     renderChatSessionsList();
+    renderWelcomeMessage();
 }
 
-async function selectChatSession(sessionId) {
-    currentSessionId = sessionId;
-    renderChatSessionsList();
-
-    const activeSession = chatSessions.find(s => s.id === sessionId);
-    const titleEl = document.getElementById('active-chat-title');
-    if (titleEl && activeSession) {
-        titleEl.innerText = activeSession.title;
-    }
-
-    const chatContainer = document.getElementById('chat-messages');
-    if (!chatContainer) return;
-
-    chatContainer.innerHTML = `<div class="text-center text-xs text-slate-500 py-4">Loading conversation...</div>`;
-
-    const { data, error } = await supabaseClient
-        .from('chat_messages')
-        .select('*')
-        .eq('session_id', sessionId)
-        .order('created_at', { ascending: true });
-
-    if (error || !data || data.length === 0) {
-        chatContainer.innerHTML = `
-            <div class="flex items-start space-x-3">
-                <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
-                    <i data-lucide="flower-2" class="w-4 h-4"></i>
-                </div>
-                <div class="bloom-chat-bubble-ai bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 text-sm leading-relaxed">
-                    Hey there. 👋 I’m Bloom. Ask me anything, upload an image or file, or ask me to create a visual roadmap!
-                </div>
-            </div>
-        `;
-    } else {
-        chatContainer.innerHTML = data.map(m => {
-            if (m.role === 'user') {
-                return `
-                    <div class="flex items-start justify-end space-x-3">
-                        <div class="bg-rose-600 text-white p-4 rounded-2xl rounded-tr-none max-w-[85%] text-sm leading-relaxed shadow-md whitespace-pre-wrap">
-                            ${escapeHtml(m.content)}
-                        </div>
-                    </div>
-                `;
-            } else {
-                return `
-                    <div class="flex items-start space-x-3">
-                        <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
-                            <i data-lucide="flower-2" class="w-4 h-4"></i>
-                        </div>
-                        <div class="bloom-chat-bubble-ai bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 text-sm leading-relaxed">
-                            ${formatAiMessageContent(m.content)}
-                        </div>
-                    </div>
-                `;
-            }
-        }).join('');
-    }
-    chatContainer.scrollTop = chatContainer.scrollHeight;
-    if (window.lucide) lucide.createIcons();
-    await renderDiagramsInChat();
-}
-
-async function deleteChatSession(event, sessionId) {
-    event.stopPropagation();
-    if (!confirm("Delete this chat conversation?")) return;
-
+async function deleteChatSession(sessionId) {
     const { error } = await supabaseClient
         .from('chat_sessions')
         .delete()
         .eq('id', sessionId);
 
     if (error) {
-        console.error("Error deleting session:", error);
+        console.error('Error deleting session:', error);
         return;
     }
 
     chatSessions = chatSessions.filter(s => s.id !== sessionId);
-    if (currentSessionId === sessionId) {
-        currentSessionId = null;
-        if (chatSessions.length > 0) {
-            selectChatSession(chatSessions[0].id);
-        } else {
-            await createNewChatSession();
-        }
+    if (activeChatSessionId === sessionId) {
+        activeChatSessionId = chatSessions.length > 0 ? chatSessions[0].id : null;
+    }
+
+    renderChatSessionsList();
+    if (activeChatSessionId) {
+        await selectChatSession(activeChatSessionId);
     } else {
-        renderChatSessionsList();
+        await createNewChatSession();
+    }
+}
+
+async function selectChatSession(sessionId) {
+    activeChatSessionId = sessionId;
+    renderChatSessionsList();
+
+    const chatBox = document.getElementById('chat-messages');
+    if (!chatBox) return;
+
+    chatBox.innerHTML = `<div class="text-center py-6 text-xs text-slate-500 animate-pulse">Loading conversation...</div>`;
+
+    const { data: messages, error } = await supabaseClient
+        .from('chat_messages')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('created_at', { ascending: true });
+
+    if (error) {
+        console.error('Error loading messages:', error);
+        chatBox.innerHTML = `<div class="text-center py-6 text-xs text-red-400">Failed to load messages.</div>`;
+        return;
+    }
+
+    chatBox.innerHTML = '';
+    if (!messages || messages.length === 0) {
+        renderWelcomeMessage();
+    } else {
+        messages.forEach(m => {
+            appendMessageToDOM(m.role, m.content, m.attachment_names || []);
+        });
+    }
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+function renderWelcomeMessage() {
+    const chatBox = document.getElementById('chat-messages');
+    if (!chatBox) return;
+    chatBox.innerHTML = `
+        <div class="flex items-start space-x-3">
+            <div class="w-8 h-8 rounded-full bg-rose-500/20 flex items-center justify-center border border-rose-500/40 shrink-0">
+                <i data-lucide="bot" class="w-4 h-4 text-rose-400"></i>
+            </div>
+            <div class="p-4 rounded-2xl rounded-tl-sm bg-slate-900 border border-white/10 text-sm text-slate-200 max-w-[85%] bloom-chat-bubble-ai">
+                Hey! I'm BloomAI. How are you feeling today? Ask me about goals, school/work balance, stress, or attach a file/image to analyze.
+            </div>
+        </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+}
+
+function appendMessageToDOM(role, text, attachmentNames = []) {
+    const chatBox = document.getElementById('chat-messages');
+    if (!chatBox) return;
+
+    const isUser = role === 'user';
+    const wrapper = document.createElement('div');
+    wrapper.className = `flex items-start space-x-3 ${isUser ? 'justify-end' : ''}`;
+
+    let attachmentsHtml = '';
+    if (attachmentNames && attachmentNames.length > 0) {
+        attachmentsHtml = `<div class="flex flex-wrap gap-1.5 mb-2">` +
+            attachmentNames.map(name => `<span class="inline-flex items-center gap-1 text-[11px] bg-black/30 px-2 py-0.5 rounded border border-white/10"><i data-lucide="paperclip" class="w-3 h-3"></i>${escapeHtml(name)}</span>`).join('') +
+            `</div>`;
+    }
+
+    const bodyHtml = isUser
+        ? `${attachmentsHtml}<div class="whitespace-pre-wrap">${escapeHtml(text)}</div>`
+        : `${attachmentsHtml}<div class="bloom-markdown">${formatAiMessageContent(text)}</div>`;
+
+    if (isUser) {
+        wrapper.innerHTML = `
+            <div class="p-4 rounded-2xl rounded-tr-sm bg-rose-500 text-white text-sm max-w-[85%] shadow-md bloom-chat-bubble-user">
+                ${bodyHtml}
+            </div>
+        `;
+    } else {
+        wrapper.innerHTML = `
+            <div class="w-8 h-8 rounded-full bg-rose-500/20 flex items-center justify-center border border-rose-500/40 shrink-0">
+                <i data-lucide="bot" class="w-4 h-4 text-rose-400"></i>
+            </div>
+            <div class="p-4 rounded-2xl rounded-tl-sm bg-slate-900 border border-white/10 text-sm text-slate-200 max-w-[85%] space-y-2 bloom-chat-bubble-ai">
+                <div class="flex items-center justify-between gap-2 pb-1 border-b border-white/5">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-rose-400">Bloom AI</span>
+                    <span class="text-[10px] text-slate-500">AI-generated guidance</span>
+                </div>
+                ${bodyHtml}
+            </div>
+        `;
+    }
+
+    chatBox.appendChild(wrapper);
+    chatBox.scrollTop = chatBox.scrollHeight;
+    if (window.lucide) lucide.createIcons();
+    if (!isUser && window.mermaid) {
+        const mermaidNodes = wrapper.querySelectorAll('.mermaid');
+        if (mermaidNodes.length > 0) {
+            mermaid.run({ nodes: mermaidNodes }).catch(err => console.error('Mermaid render error:', err));
+        }
+    }
+}
+
+async function handleSendMessage(e) {
+    if (e && e.preventDefault) e.preventDefault();
+
+    const input = document.getElementById('chat-input');
+    const chatBox = document.getElementById('chat-messages');
+    if (!input || !chatBox) return;
+
+    const msg = input.value.trim();
+    const filesToSend = [...attachedFiles];
+    if (!msg && filesToSend.length === 0) return;
+
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const displayText = msg || (filesToSend.length > 0 ? `[Attached ${filesToSend.length} file(s)]` : '');
+    const fileNames = filesToSend.map(f => f.name);
+
+    appendMessageToDOM('user', displayText, fileNames);
+    input.value = '';
+    attachedFiles = [];
+    renderAttachmentsPreview();
+
+    let currentSessionId = activeChatSessionId;
+    if (session) {
+        if (!currentSessionId) {
+            const { data: newSess } = await supabaseClient
+                .from('chat_sessions')
+                .insert([{ title: msg ? msg.slice(0, 32) : 'Attachment Chat', user_id: session.user.id }])
+                .select()
+                .single();
+            if (newSess) {
+                currentSessionId = newSess.id;
+                activeChatSessionId = newSess.id;
+                chatSessions.unshift(newSess);
+                renderChatSessionsList();
+            }
+        } else {
+            const currentSess = chatSessions.find(s => s.id === currentSessionId);
+            if (currentSess && currentSess.title === 'New Chat' && msg) {
+                const newTitle = msg.slice(0, 32) + (msg.length > 32 ? '...' : '');
+                await supabaseClient
+                    .from('chat_sessions')
+                    .update({ title: newTitle })
+                    .eq('id', currentSessionId);
+                currentSess.title = newTitle;
+                renderChatSessionsList();
+            }
+        }
+
+        if (currentSessionId) {
+            await supabaseClient
+                .from('chat_messages')
+                .insert([{
+                    session_id: currentSessionId,
+                    user_id: session.user.id,
+                    role: 'user',
+                    content: displayText,
+                    attachment_names: fileNames
+                }]);
+        }
+    }
+
+    const typingId = 'typing-' + Date.now();
+    const typingEl = document.createElement('div');
+    typingEl.id = typingId;
+    typingEl.className = 'flex items-start space-x-3';
+    typingEl.innerHTML = `
+        <div class="w-8 h-8 rounded-full bg-rose-500/20 flex items-center justify-center border border-rose-500/40 shrink-0">
+            <i data-lucide="bot" class="w-4 h-4 text-rose-400"></i>
+        </div>
+        <div class="p-4 rounded-2xl rounded-tl-sm bg-slate-900 border border-white/10 text-sm text-slate-400 bloom-chat-bubble-ai">
+            <span class="animate-pulse">BloomAI is thinking...</span>
+        </div>
+    `;
+    chatBox.appendChild(typingEl);
+    chatBox.scrollTop = chatBox.scrollHeight;
+    if (window.lucide) lucide.createIcons();
+
+    try {
+        const systemPrompt = "You are BloomAI, a warm, empathetic, insightful mentor and life coach for youth and young adults. Give clear, practical, structured answers. Use clean markdown formatting and tables when comparing options. Only include a ```mermaid flowchart``` when mapping a multi-step roadmap, decision tree, or workflow.";
+
+        const payload = {
+            prompt: msg || "Please analyze the attached file(s) and share helpful insights.",
+            systemInstruction: systemPrompt,
+            files: filesToSend
+        };
+
+        const { data, error } = await supabaseClient.functions.invoke('gemini-proxy', {
+            body: payload
+        });
+
+        const typingNode = document.getElementById(typingId);
+        if (typingNode) typingNode.remove();
+
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error.message || JSON.stringify(data.error));
+
+        const rawReply = data?.candidates?.[0]?.content?.parts?.[0]?.text
+            || data?.reply
+            || "I'm here with you! Could you share a little more detail?";
+        const reply = cleanModelMarkdown(rawReply);
+
+        appendMessageToDOM('assistant', reply);
+
+        if (session && currentSessionId) {
+            await supabaseClient
+                .from('chat_messages')
+                .insert([{
+                    session_id: currentSessionId,
+                    user_id: session.user.id,
+                    role: 'assistant',
+                    content: reply,
+                    attachment_names: []
+                }]);
+        }
+    } catch (err) {
+        console.error("Chat error:", err);
+        const typingNode = document.getElementById(typingId);
+        if (typingNode) typingNode.remove();
+
+        const errDiv = document.createElement('div');
+        errDiv.className = 'flex items-start space-x-3';
+        errDiv.innerHTML = `
+            <div class="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center border border-red-500/40 shrink-0">
+                <i data-lucide="alert-circle" class="w-4 h-4 text-red-400"></i>
+            </div>
+            <div class="p-4 rounded-2xl rounded-tl-sm bg-red-950/40 border border-red-500/30 text-sm text-red-200 max-w-[85%]">
+                BloomAI hit a snag: ${escapeHtml(err.message)}
+            </div>
+        `;
+        chatBox.appendChild(errDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+        if (window.lucide) lucide.createIcons();
     }
 }
 
 function sendQuickPrompt(promptText) {
     const input = document.getElementById('chat-input');
-    if (!input) return;
-    input.value = promptText;
+    if (input) input.value = promptText;
     handleSendMessage(new Event('submit'));
 }
 
-async function handleSendMessage(e) {
-    if (e && typeof e.preventDefault === 'function') e.preventDefault();
-    if (isSendingMessage) return;
-
-    const input = document.getElementById('chat-input');
-    const text = input ? input.value.trim() : '';
-    if (!text && attachedFiles.length === 0) return;
-
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session) {
-        alert("Please log in to chat.");
-        switchTab('auth');
-        return;
-    }
-
-    if (!currentSessionId) {
-        await createNewChatSession();
-    }
-
-    const chatContainer = document.getElementById('chat-messages');
-    const filesSnapshot = [...attachedFiles];
-    const attachedNames = filesSnapshot.map(f => f.name).join(', ');
-    const displayPrompt = text
-        ? (attachedNames ? `${text} [Attached: ${attachedNames}]` : text)
-        : `[Attached: ${attachedNames}]`;
-
-    if (input) input.value = '';
-    attachedFiles = [];
-    renderAttachmentsPreview();
-    isSendingMessage = true;
-
-    if (chatContainer) {
-        chatContainer.insertAdjacentHTML('beforeend', `
-            <div class="flex items-start justify-end space-x-3">
-                <div class="bg-rose-600 text-white p-4 rounded-2xl rounded-tr-none max-w-[85%] text-sm leading-relaxed shadow-md whitespace-pre-wrap">
-                    ${escapeHtml(displayPrompt)}
-                </div>
-            </div>
-        `);
-
-        chatContainer.insertAdjacentHTML('beforeend', `
-            <div id="bloom-typing-row" class="flex items-start space-x-3">
-                <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
-                    <i data-lucide="flower-2" class="w-4 h-4"></i>
-                </div>
-                <div class="bloom-chat-bubble-ai bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none text-slate-400 text-sm animate-pulse">
-                    Bloom is thinking...
-                </div>
-            </div>
-        `);
-        chatContainer.scrollTop = chatContainer.scrollHeight;
-        if (window.lucide) lucide.createIcons();
-    }
-
-    try {
-        await supabaseClient.from('chat_messages').insert([{
-            session_id: currentSessionId,
-            user_id: session.user.id,
-            role: 'user',
-            content: displayPrompt
-        }]);
-
-        const activeSession = chatSessions.find(s => s.id === currentSessionId);
-        if (activeSession && activeSession.title === 'New Conversation' && text) {
-            const shortTitle = text.slice(0, 36);
-            await supabaseClient
-                .from('chat_sessions')
-                .update({ title: shortTitle })
-                .eq('id', currentSessionId);
-            activeSession.title = shortTitle;
-            const titleEl = document.getElementById('active-chat-title');
-            if (titleEl) titleEl.innerText = shortTitle;
-            renderChatSessionsList();
-        }
-
-        const { data, error } = await supabaseClient.functions.invoke('gemini-proxy', {
-            body: {
-                prompt: text || 'Analyze the attached file(s).',
-                files: filesSnapshot
-            }
-        });
-
-        if (error) throw error;
-        if (data?.error) throw new Error(data.error.message || JSON.stringify(data.error));
-
-        const rawReply =
-            data?.candidates?.[0]?.content?.parts?.[0]?.text
-            || data?.reply
-            || "I didn't receive a text response—please try again.";
-        const formattedHtml = formatAiMessageContent(rawReply);
-
-        document.getElementById('bloom-typing-row')?.remove();
-
-        if (chatContainer) {
-            chatContainer.insertAdjacentHTML('beforeend', `
-                <div class="flex items-start space-x-3">
-                    <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
-                        <i data-lucide="flower-2" class="w-4 h-4"></i>
-                    </div>
-                    <div class="bloom-chat-bubble-ai bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 text-sm leading-relaxed">
-                        ${formattedHtml}
-                    </div>
-                </div>
-            `);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-            if (window.lucide) lucide.createIcons();
-            await renderDiagramsInChat();
-        }
-
-        await supabaseClient.from('chat_messages').insert([{
-            session_id: currentSessionId,
-            user_id: session.user.id,
-            role: 'assistant',
-            content: rawReply
-        }]);
-    } catch (err) {
-        console.error("Chat error:", err);
-        document.getElementById('bloom-typing-row')?.remove();
-        if (chatContainer) {
-            chatContainer.insertAdjacentHTML('beforeend', `
-                <div class="flex items-start space-x-3">
-                    <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
-                        <i data-lucide="alert-circle" class="w-4 h-4"></i>
-                    </div>
-                    <div class="bloom-chat-bubble-ai bg-slate-800/80 border border-rose-500/30 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-rose-300 text-sm">
-                        Couldn't complete that request: ${escapeHtml(err.message)}
-                    </div>
-                </div>
-            `);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-            if (window.lucide) lucide.createIcons();
-        }
-    } finally {
-        isSendingMessage = false;
-    }
-}
-
-// --- AUTHENTICATION ---
+// --- SUPABASE AUTHENTICATION ---
 let isSignUpMode = false;
 
 function toggleAuthMode() {
     isSignUpMode = !isSignUpMode;
     const titleEl = document.getElementById('auth-title');
-    const subtitleEl = document.getElementById('auth-subtitle');
     const submitBtn = document.getElementById('auth-submit-btn');
     const toggleBtn = document.getElementById('auth-toggle-btn');
 
-    if (titleEl) titleEl.innerText = isSignUpMode ? 'Create Your Account' : 'Welcome Back';
-    if (subtitleEl) subtitleEl.innerText = isSignUpMode
-        ? 'Sign up to save tasks and Bloom AI chats.'
-        : 'Sign in to sync your tasks and Bloom AI chats.';
-    if (submitBtn) submitBtn.innerText = isSignUpMode ? 'Create Account' : 'Sign In';
+    if (titleEl) titleEl.textContent = isSignUpMode ? 'Create Account' : 'Welcome Back';
+    if (submitBtn) submitBtn.textContent = isSignUpMode ? 'Sign Up' : 'Sign In';
     if (toggleBtn) {
         toggleBtn.innerHTML = isSignUpMode
             ? 'Already have an account? <span class="font-bold text-white">Sign In</span>'
-            : "Don't have an account? <span class=\"font-bold text-white\">Sign Up</span>";
+            : "Don't have an account? <span class="font-bold text-white">Sign Up</span>";
     }
 }
 
 async function handleAuthSubmit(e) {
     e.preventDefault();
-    const email = document.getElementById('auth-email')?.value.trim();
-    const password = document.getElementById('auth-password')?.value;
-    const errEl = document.getElementById('auth-error');
-    const okEl = document.getElementById('auth-success');
+    const emailInput = document.getElementById('auth-email');
+    const passwordInput = document.getElementById('auth-password');
+    const errorBox = document.getElementById('auth-error');
+    const successBox = document.getElementById('auth-success');
+    if (!emailInput || !passwordInput) return;
 
-    if (errEl) errEl.classList.add('hidden');
-    if (okEl) okEl.classList.add('hidden');
+    if (errorBox) errorBox.classList.add('hidden');
+    if (successBox) successBox.classList.add('hidden');
 
-    const res = isSignUpMode
-        ? await supabaseClient.auth.signUp({ email, password })
-        : await supabaseClient.auth.signInWithPassword({ email, password });
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
 
-    if (res.error) {
-        if (errEl) {
-            errEl.textContent = res.error.message;
-            errEl.classList.remove('hidden');
+    if (isSignUpMode) {
+        const { error } = await supabaseClient.auth.signUp({ email, password });
+        if (error) {
+            if (errorBox) { errorBox.textContent = error.message; errorBox.classList.remove('hidden'); }
+        } else if (successBox) {
+            successBox.textContent = 'Account created! Check your email or sign in.';
+            successBox.classList.remove('hidden');
         }
-        return;
-    }
-
-    if (isSignUpMode && !res.data.session) {
-        if (okEl) {
-            okEl.textContent = 'Check your email to confirm your account, then sign in.';
-            okEl.classList.remove('hidden');
+    } else {
+        const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+        if (error) {
+            if (errorBox) { errorBox.textContent = error.message; errorBox.classList.remove('hidden'); }
+        } else {
+            emailInput.value = '';
+            passwordInput.value = '';
+            switchTab('home');
         }
-        return;
     }
-
-    switchTab('home');
 }
 
 async function handleForgotPassword() {
-    const email = document.getElementById('auth-email')?.value.trim();
-    const errEl = document.getElementById('auth-error');
-    const okEl = document.getElementById('auth-success');
-
+    const emailInput = document.getElementById('auth-email');
+    const email = emailInput ? emailInput.value.trim() : '';
     if (!email) {
-        if (errEl) {
-            errEl.textContent = 'Enter your email address first.';
-            errEl.classList.remove('hidden');
-        }
+        alert('Enter your email address first.');
         return;
     }
-
     const { error } = await supabaseClient.auth.resetPasswordForEmail(email);
-    if (error && errEl) {
-        errEl.textContent = error.message;
-        errEl.classList.remove('hidden');
-    } else if (okEl) {
-        okEl.textContent = 'Password reset link sent to your email.';
-        okEl.classList.remove('hidden');
-    }
+    if (error) alert(error.message);
+    else alert('Password reset link sent to your email.');
 }
 
 async function handleUpdatePassword(e) {
     e.preventDefault();
-    const password = document.getElementById('new-password')?.value;
-    const errEl = document.getElementById('reset-error');
-    const { error } = await supabaseClient.auth.updateUser({ password });
-    if (error && errEl) {
-        errEl.textContent = error.message;
-        errEl.classList.remove('hidden');
-    } else {
+    const newPwdInput = document.getElementById('new-password');
+    if (!newPwdInput) return;
+    const { error } = await supabaseClient.auth.updateUser({ password: newPwdInput.value });
+    if (error) alert(error.message);
+    else {
+        alert('Password updated!');
         document.getElementById('reset-password-form')?.classList.add('hidden');
         document.getElementById('auth-form')?.classList.remove('hidden');
-        switchTab('home');
     }
 }
 
-async function syncAuthButton() {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    const btn = document.getElementById('auth-nav-btn');
-    if (!btn) return;
+async function handleSignOut() {
+    await supabaseClient.auth.signOut();
+    activeChatSessionId = null;
+    chatSessions = [];
+    googleAccessToken = null;
+    switchTab('auth');
+}
+
+function updateAuthUI(session) {
+    const authNavBtn = document.getElementById('auth-nav-btn');
+    if (!authNavBtn) return;
 
     if (session) {
-        btn.innerHTML = `<i data-lucide="log-out" class="w-4 h-4"></i><span>Log Out</span>`;
-        btn.onclick = async () => {
-            await supabaseClient.auth.signOut();
-            switchTab('home');
-        };
+        authNavBtn.innerHTML = `<i data-lucide="log-out" class="w-4 h-4"></i><span>Sign Out</span>`;
+        authNavBtn.onclick = handleSignOut;
     } else {
-        btn.innerHTML = `<i data-lucide="log-in" class="w-4 h-4"></i><span>Log In</span>`;
-        btn.onclick = () => switchTab('auth');
+        authNavBtn.innerHTML = `<i data-lucide="log-in" class="w-4 h-4"></i><span>Log In</span>`;
+        authNavBtn.onclick = () => switchTab('auth');
     }
     if (window.lucide) lucide.createIcons();
 }
 
-// --- FOCUS RADIO ---
-let isPlayingMusic = false;
+supabaseClient.auth.onAuthStateChange((_event, session) => {
+    updateAuthUI(session);
+    fetchTasks();
+    if (session && document.getElementById('view-chat') && !document.getElementById('view-chat').classList.contains('hidden')) {
+        loadChatSessions();
+    }
+});
+
+// --- FOCUS RADIO STREAM PLAYER ---
+let focusAudio = null;
+let isMusicPlaying = false;
+
+function ensureFocusAudio() {
+    const stationSelect = document.getElementById('music-station');
+    const volSlider = document.getElementById('music-volume');
+    if (!focusAudio) {
+        focusAudio = new Audio(stationSelect ? stationSelect.value : 'https://streams.ilovemusic.de/iloveradio17.mp3');
+        focusAudio.preload = 'none';
+    }
+    if (volSlider) {
+        focusAudio.volume = Math.max(0, Math.min(1, Number(volSlider.value) || 0.35));
+    }
+    return focusAudio;
+}
+
+function updateMusicIcon() {
+    const icon = document.getElementById('music-icon');
+    if (icon) icon.setAttribute('data-lucide', isMusicPlaying ? 'pause' : 'play');
+    if (window.lucide) lucide.createIcons();
+}
 
 function toggleMusic() {
-    const audio = document.getElementById('bg-audio');
-    const icon = document.getElementById('music-icon');
-    if (!audio) return;
-
-    if (isPlayingMusic) {
+    const audio = ensureFocusAudio();
+    if (isMusicPlaying) {
         audio.pause();
-        isPlayingMusic = false;
-        if (icon) icon.setAttribute('data-lucide', 'play');
+        isMusicPlaying = false;
+        updateMusicIcon();
     } else {
         audio.play().then(() => {
-            isPlayingMusic = true;
-            if (icon) icon.setAttribute('data-lucide', 'pause');
-            if (window.lucide) lucide.createIcons();
-        }).catch(err => console.warn('Audio play blocked/error:', err));
+            isMusicPlaying = true;
+            updateMusicIcon();
+        }).catch(err => {
+            console.error('Radio playback failed:', err);
+        });
     }
-    if (window.lucide) lucide.createIcons();
 }
 
 function changeStation() {
-    const select = document.getElementById('music-station');
-    const audio = document.getElementById('bg-audio');
-    const source = document.getElementById('bg-audio-source');
-    if (!select || !audio || !source) return;
-
-    source.src = select.value;
+    const stationSelect = document.getElementById('music-station');
+    if (!stationSelect) return;
+    const audio = ensureFocusAudio();
+    audio.src = stationSelect.value;
     audio.load();
-    if (isPlayingMusic) {
-        audio.play().catch(err => console.warn('Station switch error:', err));
+    if (isMusicPlaying) {
+        audio.play().catch(err => console.error('Station switch error:', err));
     }
 }
 
 function setMusicVolume(val) {
-    const audio = document.getElementById('bg-audio');
-    if (audio) audio.volume = parseFloat(val);
+    const audio = ensureFocusAudio();
+    audio.volume = Math.max(0, Math.min(1, Number(val) || 0));
 }
 
-function handleAudioError() {
-    isPlayingMusic = false;
-    const icon = document.getElementById('music-icon');
-    if (icon) icon.setAttribute('data-lucide', 'play');
-    if (window.lucide) lucide.createIcons();
-}
-
-// --- INITIALIZATION ---
+// INITIALIZATION ON PAGE LOAD
 document.addEventListener('DOMContentLoaded', async () => {
     const taskForm = document.getElementById('task-form');
     if (taskForm) taskForm.addEventListener('submit', handleAddTask);
 
-    const volInput = document.getElementById('music-volume');
-    const audio = document.getElementById('bg-audio');
-    if (volInput && audio) audio.volume = parseFloat(volInput.value);
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    updateAuthUI(session);
 
-    supabaseClient.auth.onAuthStateChange((event) => {
-        syncAuthButton();
-        if (event === 'PASSWORD_RECOVERY') {
-            switchTab('auth');
-            document.getElementById('auth-form')?.classList.add('hidden');
-            document.getElementById('reset-password-form')?.classList.remove('hidden');
-        }
-    });
+    if (session) {
+        switchTab('home');
+    } else {
+        switchTab('auth');
+    }
 
-    await syncAuthButton();
+    const quoteEl = document.getElementById('inspirational-quote');
+    const sourceEl = document.getElementById('quote-source');
+    if (quoteEl && sourceEl) {
+        quoteEl.innerText = quotes[0].text;
+        sourceEl.innerText = `— ${quotes[0].source}`;
+    }
+
     if (window.lucide) lucide.createIcons();
 });

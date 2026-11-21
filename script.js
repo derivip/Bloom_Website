@@ -3,7 +3,7 @@
 const SUPABASE_URL = 'https://xmqmrkqyjnbupyalhnib.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_7AqK322TINFq1y39lMgvTw_Z7Itc79G';
 
-const GOOGLE_CLIENT_ID = '791171042182-4l9e9vjt3t9p2aa7p3bubc50s4pr3an7.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com';
 const GOOGLE_CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
 let googleAccessToken = null;
 
@@ -578,4 +578,379 @@ async function openGuideTopic(categoryKey, topicId) {
     if (!topic) return;
     activeGuideTopic = topic;
 
-    ['auth', 'home',
+    ['auth', 'home', 'tasks', 'learn', 'guide-detail', 'chat'].forEach(t => {
+        const view = document.getElementById(`view-${t}`);
+        if (view) view.classList.add('hidden');
+    });
+
+    const detailView = document.getElementById('view-guide-detail');
+    if (detailView) detailView.classList.remove('hidden');
+
+    const titleEl = document.getElementById('guide-detail-title');
+    const descEl = document.getElementById('guide-detail-desc');
+    const badgeEl = document.getElementById('guide-detail-badge');
+    const videoEl = document.getElementById('guide-video-player');
+    const videoDlEl = document.getElementById('guide-video-download');
+    const audioEl = document.getElementById('guide-audio-player');
+    const transcriptBox = document.getElementById('guide-transcript-box');
+
+    if (titleEl) titleEl.textContent = topic.title;
+    if (descEl) descEl.textContent = topic.desc;
+    if (badgeEl) badgeEl.textContent = topic.type;
+
+    const videoUrl = getSupabasePublicFileUrl(topic.videoPath);
+    if (videoEl) { videoEl.src = videoUrl; videoEl.load(); }
+    if (videoDlEl) videoDlEl.href = videoUrl || '#';
+
+    const audioUrl = getSupabasePublicFileUrl(topic.podcastPath);
+    if (audioEl) { audioEl.src = audioUrl; audioEl.load(); }
+
+    let resolvedTranscript = topic.transcriptText || '';
+    if (topic.transcriptPath) {
+        try {
+            const txUrl = getSupabasePublicFileUrl(topic.transcriptPath);
+            if (txUrl) {
+                const resp = await fetch(txUrl);
+                if (resp.ok) {
+                    const txt = await resp.text();
+                    if (txt.trim()) resolvedTranscript = txt.trim();
+                }
+            }
+        } catch (_err) {}
+    }
+
+    topic.resolvedTranscript = resolvedTranscript;
+    if (transcriptBox) transcriptBox.textContent = resolvedTranscript || 'Transcript coming soon.';
+    if (window.lucide) lucide.createIcons();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function downloadActiveGuidePodcast() {
+    if (!activeGuideTopic) return;
+    const url = getSupabasePublicFileUrl(activeGuideTopic.podcastPath);
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+async function downloadActiveGuideTranscript() {
+    if (!activeGuideTopic) return;
+    const text = activeGuideTopic.resolvedTranscript || activeGuideTopic.transcriptText || '';
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${activeGuideTopic.id}-transcript.txt`;
+    a.click();
+}
+
+function explainActiveGuideWithBloomAI() {
+    switchTab('chat');
+    const input = document.getElementById('chat-input');
+    if (input && activeGuideTopic) {
+        input.value = activeGuideTopic.bloomPrompt || `Explain "${activeGuideTopic.title}".`;
+        input.focus();
+    }
+}
+
+// --- MULTIMODAL, VOICE & CHAT ---
+async function handleFileSelection(e) {
+    const files = Array.from(e.target.files || []);
+    for (const file of files) {
+        const reader = new FileReader();
+        reader.onload = ev => {
+            attachedFiles.push({
+                name: file.name,
+                type: file.type || 'application/octet-stream',
+                data: String(ev.target.result || '').split(',')[1] || ''
+            });
+            renderAttachmentsPreview();
+        };
+        reader.readAsDataURL(file);
+    }
+    e.target.value = '';
+}
+
+function renderAttachmentsPreview() {
+    const el = document.getElementById('chat-attachments-preview');
+    if (!el) return;
+    if (!attachedFiles.length) {
+        el.classList.add('hidden');
+        el.innerHTML = '';
+        return;
+    }
+    el.classList.remove('hidden');
+    el.innerHTML = attachedFiles.map((f, i) => `
+        <span class="px-2.5 py-1 rounded-lg bg-slate-950 border border-rose-500/30 text-xs text-slate-200 inline-flex items-center gap-1.5">
+            ${escapeHtml(f.name)}
+            <button type="button" onclick="attachedFiles.splice(${i},1);renderAttachmentsPreview()" class="text-rose-400">×</button>
+        </span>
+    `).join('');
+}
+
+let recognition = null;
+let isRecording = false;
+
+function toggleVoiceRecording() {
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRec) {
+        alert('Speech recognition is not supported in this browser.');
+        return;
+    }
+    const micBtn = document.getElementById('mic-btn');
+    const input = document.getElementById('chat-input');
+    if (isRecording && recognition) {
+        recognition.stop();
+        return;
+    }
+    recognition = new SpeechRec();
+    recognition.lang = 'en-US';
+    recognition.onstart = () => {
+        isRecording = true;
+        micBtn?.classList.add('text-rose-400', 'animate-pulse');
+    };
+    recognition.onresult = ev => {
+        if (input) input.value = ev.results[0][0].transcript;
+    };
+    recognition.onend = () => {
+        isRecording = false;
+        micBtn?.classList.remove('text-rose-400', 'animate-pulse');
+        if (input?.value.trim()) handleSendMessage(new Event('submit'));
+    };
+    recognition.start();
+}
+
+function cleanModelMarkdown(rawText) {
+    return String(rawText ?? '')
+        .replace(/\[\s*\]/g, '')
+        .replace(/\*{4,}/g, '**')
+        .trim();
+}
+
+function formatAiMessageContent(rawText) {
+    const cleaned = cleanModelMarkdown(rawText);
+    if (!cleaned) return '<p>No response returned.</p>';
+    return window.marked
+        ? marked.parse(cleaned, { breaks: true, gfm: true })
+        : `<p>${escapeHtml(cleaned).replace(/\n/g, '<br>')}</p>`;
+}
+
+async function loadChatSessions() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const listContainer = document.getElementById('chat-sessions-list');
+    if (!session) {
+        if (listContainer) listContainer.innerHTML = `<p class="text-xs text-slate-500 p-2 text-center">Sign in to save chat history</p>`;
+        return;
+    }
+    const { data } = await supabaseClient.from('chat_sessions').select('*').order('created_at', { ascending: false });
+    chatSessions = data || [];
+    renderChatSessionsList();
+    if (chatSessions.length > 0) {
+        await selectChatSession(activeChatSessionId || chatSessions[0].id);
+    } else {
+        await createNewChatSession();
+    }
+}
+
+function renderChatSessionsList() {
+    const listContainer = document.getElementById('chat-sessions-list');
+    if (!listContainer) return;
+    listContainer.innerHTML = chatSessions.map(s => `
+        <button type="button" onclick="selectChatSession('${s.id}')" class="w-full text-left px-3 py-2 rounded-xl text-xs truncate ${s.id === activeChatSessionId ? 'bg-rose-500/20 text-white border border-rose-500/40' : 'text-slate-400 hover:bg-white/5'}">
+            ${escapeHtml(s.title || 'New Chat')}
+        </button>
+    `).join('');
+}
+
+async function createNewChatSession() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) return;
+    const { data } = await supabaseClient.from('chat_sessions').insert([{ title: 'New Chat', user_id: session.user.id }]).select().single();
+    if (data) {
+        activeChatSessionId = data.id;
+        chatSessions.unshift(data);
+        renderChatSessionsList();
+        const box = document.getElementById('chat-messages');
+        if (box) box.innerHTML = '';
+    }
+}
+
+async function selectChatSession(sessionId) {
+    activeChatSessionId = sessionId;
+    renderChatSessionsList();
+    const box = document.getElementById('chat-messages');
+    if (!box) return;
+    const { data: messages } = await supabaseClient.from('chat_messages').select('*').eq('session_id', sessionId).order('created_at', { ascending: true });
+    box.innerHTML = '';
+    (messages || []).forEach(m => appendMessageToDOM(m.role, m.content, m.attachment_names || []));
+}
+
+function appendMessageToDOM(role, text, attachmentNames = []) {
+    const chatBox = document.getElementById('chat-messages');
+    if (!chatBox) return;
+    const isUser = role === 'user';
+    const wrapper = document.createElement('div');
+    wrapper.className = `flex items-start space-x-3 ${isUser ? 'justify-end' : ''}`;
+    wrapper.innerHTML = isUser
+        ? `<div class="p-4 rounded-2xl rounded-tr-sm bg-rose-500 text-white text-sm max-w-[85%] whitespace-pre-wrap">${escapeHtml(text)}</div>`
+        : `<div class="p-4 rounded-2xl rounded-tl-sm bg-slate-900 border border-white/10 text-sm text-slate-200 max-w-[85%] bloom-markdown">${formatAiMessageContent(text)}</div>`;
+    chatBox.appendChild(wrapper);
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+async function handleSendMessage(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const input = document.getElementById('chat-input');
+    if (!input) return;
+    const msg = input.value.trim();
+    const filesToSend = [...attachedFiles];
+    if (!msg && !filesToSend.length) return;
+
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    appendMessageToDOM('user', msg || `[Attached ${filesToSend.length} file(s)]`, filesToSend.map(f => f.name));
+    input.value = '';
+    attachedFiles = [];
+    renderAttachmentsPreview();
+
+    try {
+        const { data, error } = await supabaseClient.functions.invoke('gemini-proxy', {
+            body: { prompt: msg || 'Analyze attached files.', files: filesToSend }
+        });
+        if (error) throw error;
+        const reply = cleanModelMarkdown(data?.candidates?.[0]?.content?.parts?.[0]?.text || data?.reply || 'Got it!');
+        appendMessageToDOM('assistant', reply);
+
+        if (session && activeChatSessionId) {
+            await supabaseClient.from('chat_messages').insert([
+                { session_id: activeChatSessionId, user_id: session.user.id, role: 'user', content: msg },
+                { session_id: activeChatSessionId, user_id: session.user.id, role: 'assistant', content: reply }
+            ]);
+        }
+    } catch (err) {
+        appendMessageToDOM('assistant', `Error: ${err.message}`);
+    }
+}
+
+function sendQuickPrompt(promptText) {
+    const input = document.getElementById('chat-input');
+    if (input) input.value = promptText;
+    handleSendMessage(new Event('submit'));
+}
+
+// --- AUTH ---
+function toggleAuthMode() {
+    isSignUpMode = !isSignUpMode;
+    const title = document.getElementById('auth-title');
+    const btn = document.getElementById('auth-submit-btn');
+    const toggle = document.getElementById('auth-toggle-btn');
+    if (title) title.textContent = isSignUpMode ? 'Create Account' : 'Welcome Back';
+    if (btn) btn.textContent = isSignUpMode ? 'Sign Up' : 'Sign In';
+    if (toggle) toggle.innerHTML = isSignUpMode
+        ? 'Already have an account? <span class="font-bold text-white">Sign In</span>'
+        : "Don't have an account? <span class="font-bold text-white">Sign Up</span>";
+}
+
+async function handleAuthSubmit(e) {
+    e.preventDefault();
+    const email = document.getElementById('auth-email')?.value.trim() || '';
+    const password = document.getElementById('auth-password')?.value || '';
+    const errBox = document.getElementById('auth-error');
+    const okBox = document.getElementById('auth-success');
+    errBox?.classList.add('hidden');
+    okBox?.classList.add('hidden');
+
+    if (isSignUpMode) {
+        const { error } = await supabaseClient.auth.signUp({ email, password });
+        if (error && errBox) { errBox.textContent = error.message; errBox.classList.remove('hidden'); }
+        else if (okBox) { okBox.textContent = 'Account created! Check your email or sign in.'; okBox.classList.remove('hidden'); }
+    } else {
+        const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+        if (error && errBox) { errBox.textContent = error.message; errBox.classList.remove('hidden'); }
+        else switchTab('home');
+    }
+}
+
+async function handleForgotPassword() {
+    const email = document.getElementById('auth-email')?.value.trim() || '';
+    if (!email) return alert('Enter your email first.');
+    const { error } = await supabaseClient.auth.resetPasswordForEmail(email);
+    alert(error ? error.message : 'Password reset email sent.');
+}
+
+async function handleUpdatePassword(e) {
+    e.preventDefault();
+    const pwd = document.getElementById('new-password')?.value || '';
+    const { error } = await supabaseClient.auth.updateUser({ password: pwd });
+    alert(error ? error.message : 'Password updated!');
+}
+
+async function handleSignOut() {
+    await supabaseClient.auth.signOut();
+    googleAccessToken = null;
+    switchTab('auth');
+}
+
+function updateAuthUI(session) {
+    const btn = document.getElementById('auth-nav-btn');
+    if (!btn) return;
+    if (session) {
+        btn.innerHTML = `<i data-lucide="log-out" class="w-4 h-4"></i><span>Sign Out</span>`;
+        btn.onclick = handleSignOut;
+    } else {
+        btn.innerHTML = `<i data-lucide="log-in" class="w-4 h-4"></i><span>Log In</span>`;
+        btn.onclick = () => switchTab('auth');
+    }
+    if (window.lucide) lucide.createIcons();
+}
+
+supabaseClient.auth.onAuthStateChange((_event, session) => {
+    updateAuthUI(session);
+    fetchTasks();
+});
+
+// --- FOCUS RADIO ---
+function ensureFocusAudio() {
+    const stationSelect = document.getElementById('music-station');
+    const volSlider = document.getElementById('music-volume');
+    if (!focusAudio) {
+        focusAudio = new Audio(stationSelect ? stationSelect.value : 'https://streams.ilovemusic.de/iloveradio17.mp3');
+    }
+    if (volSlider) focusAudio.volume = Number(volSlider.value) || 0.35;
+    return focusAudio;
+}
+
+function toggleMusic() {
+    const audio = ensureFocusAudio();
+    const icon = document.getElementById('music-icon');
+    if (isMusicPlaying) {
+        audio.pause();
+        isMusicPlaying = false;
+        if (icon) icon.setAttribute('data-lucide', 'play');
+    } else {
+        audio.play().then(() => {
+            isMusicPlaying = true;
+            if (icon) icon.setAttribute('data-lucide', 'pause');
+            if (window.lucide) lucide.createIcons();
+        }).catch(err => console.error(err));
+    }
+    if (window.lucide) lucide.createIcons();
+}
+
+function changeStation() {
+    const stationSelect = document.getElementById('music-station');
+    if (!stationSelect) return;
+    const audio = ensureFocusAudio();
+    audio.src = stationSelect.value;
+    audio.load();
+    if (isMusicPlaying) audio.play().catch(err => console.error(err));
+}
+
+function setMusicVolume(val) {
+    const audio = ensureFocusAudio();
+    audio.volume = Math.max(0, Math.min(1, Number(val) || 0));
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+    document.getElementById('task-form')?.addEventListener('submit', handleAddTask);
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    updateAuthUI(session);
+    switchTab(session ? 'home' : 'auth');
+    if (window.lucide) lucide.createIcons();
+});

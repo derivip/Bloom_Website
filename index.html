@@ -11,7 +11,6 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
@@ -155,7 +154,7 @@
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h2 class="text-2xl font-bold text-white">Focus Tasks</h2>
-                    <p class="text-xs text-slate-400">Break big goals into tiny, stress-free micro-steps with BloomAI and sync to Google Calendar.</p>
+                    <p class="text-xs text-slate-400">Break big goals into tiny, stress-free micro-steps with BloomAI.</p>
                 </div>
                 <div class="flex items-center space-x-3 bg-slate-900/80 px-4 py-2.5 rounded-2xl border border-white/10 bloom-subtle-card">
                     <span class="text-xs text-slate-400 font-medium">Progress</span>
@@ -167,7 +166,7 @@
             </div>
 
             <!-- Add Task Form -->
-            <form id="task-form" onsubmit="handleAddTask(event)" autocomplete="off" class="grid grid-cols-1 sm:grid-cols-12 gap-3 bg-slate-900/75 p-4 rounded-2xl border border-white/10 bloom-subtle-card">
+            <form id="task-form" autocomplete="off" class="grid grid-cols-1 sm:grid-cols-12 gap-3 bg-slate-900/75 p-4 rounded-2xl border border-white/10 bloom-subtle-card">
                 <input type="text" id="task-title" required placeholder="What needs to get done?" class="sm:col-span-6 bg-slate-950/80 border border-white/15 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-rose-500">
                 <select id="task-category" class="sm:col-span-2 bg-slate-950/80 border border-white/15 rounded-xl px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-rose-500">
                     <option value="School">School</option>
@@ -198,6 +197,7 @@
 
         <!-- 3. GUIDANCE LIBRARY VIEW -->
         <section id="view-learn" class="hidden space-y-6">
+    
             <div>
                 <h2 class="text-2xl font-bold text-white">Guidance Library</h2>
                 <p class="text-xs text-slate-400">Curated strategies for school, career, emotional resilience, and focus.</p>
@@ -212,9 +212,9 @@
 
             <div id="learning-content" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
         </section>
-
         <!-- 3B. SINGLE GUIDANCE TOPIC DETAIL VIEW -->
         <section id="view-guide-detail" class="hidden space-y-6">
+            <!-- Top Bar: Back + Explain with Bloom AI -->
             <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-900/75 border border-white/10 rounded-2xl p-4 bloom-subtle-card">
                 <button type="button" onclick="switchTab('learn')" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-white flex items-center gap-2 transition-all">
                     <i data-lucide="arrow-left" class="w-4 h-4"></i>
@@ -227,13 +227,16 @@
                 </button>
             </div>
 
+            <!-- Topic Header -->
             <div class="bg-slate-900/75 border border-white/10 rounded-3xl p-6 md:p-8 space-y-2 bloom-subtle-card">
                 <span id="guide-detail-badge" class="text-xs font-bold text-rose-400 uppercase tracking-wider">Career & School</span>
                 <h2 id="guide-detail-title" class="text-2xl sm:text-3xl font-extrabold text-white">Balancing High School & Late Night Shifts</h2>
                 <p id="guide-detail-desc" class="text-sm text-slate-300 leading-relaxed"></p>
             </div>
 
+            <!-- Video + Podcast Grid -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Video Player Card -->
                 <div class="bg-slate-900/75 border border-white/10 rounded-3xl p-6 space-y-4 bloom-subtle-card">
                     <div class="flex items-center justify-between gap-2">
                         <h3 class="text-base font-bold text-white flex items-center gap-2">
@@ -249,6 +252,7 @@
                     </video>
                 </div>
 
+                <!-- Local Podcast (.M4A) Card -->
                 <div class="bg-slate-900/75 border border-white/10 rounded-3xl p-6 flex flex-col justify-between space-y-4 bloom-subtle-card">
                     <div class="space-y-2">
                         <h3 class="text-base font-bold text-white flex items-center gap-2">
@@ -271,6 +275,7 @@
                 </div>
             </div>
 
+            <!-- Video Transcript Card -->
             <div class="bg-slate-900/75 border border-white/10 rounded-3xl p-6 space-y-3 bloom-subtle-card">
                 <div class="flex flex-wrap items-center justify-between gap-2">
                     <h3 class="text-base font-bold text-white flex items-center gap-2">
@@ -405,7 +410,7 @@
     <div class="fixed bottom-0 left-0 right-0 z-40 bg-slate-950/85 border-t border-white/10 px-4 py-2 backdrop-blur-xl">
         <div class="max-w-6xl mx-auto flex items-center justify-between gap-3">
             <div class="flex items-center space-x-2.5">
-                <button type="button" onclick="toggleMusic()" class="p-2 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 hover:bg-rose-500 hover:text-white transition-all">
+                <button onclick="toggleMusic()" class="p-2 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 hover:bg-rose-500 hover:text-white transition-all">
                     <i id="music-icon" data-lucide="play" class="w-3.5 h-3.5"></i>
                 </button>
                 <span class="text-xs font-semibold text-slate-300 hidden sm:inline">Focus Radio</span>
@@ -417,27 +422,29 @@
             </div>
             <div class="flex items-center space-x-2">
                 <i data-lucide="volume-2" class="w-3.5 h-3.5 text-slate-400"></i>
-                <input type="range" id="music-volume" min="0" max="1" step="0.05" value="0.35" oninput="setMusicVolume(this.value)" class="w-20 accent-rose-500">
+                <input type="range" id="music-volume" min="0" max="1" step="0.05" value="0.4" oninput="setMusicVolume(this.value)" class="w-20 accent-rose-500">
             </div>
         </div>
+        <audio id="bg-audio" preload="none" onerror="handleAudioError()">
+            <source id="bg-audio-source" src="https://streams.ilovemusic.de/iloveradio17.mp3" type="audio/mpeg">
+        </audio>
     </div>
 
-    <!-- Companion script.js helpers so the new buttons work immediately -->
     <script>
-        function askBloomForTaskHelp(taskTitle, stepsElementId) {
-            const stepsBox = document.getElementById(stepsElementId);
-            const stepsText = stepsBox ? stepsBox.innerText.trim() : '';
-            const prompt = stepsText
-                ? `I'm working on "${taskTitle}" and generated these steps:\n${stepsText}\n\nCan you give me more help, examples, or a quick start plan?`
-                : `Can you help me break down and get started on "${taskTitle}"?`;
+        (function () {
+            const mainEl = document.getElementById("main-content");
+            const chatSection = document.getElementById("view-chat");
+            if (!mainEl || !chatSection) return;
 
-            if (typeof switchTab === 'function') switchTab('chat');
-            const input = document.getElementById('chat-input');
-            if (input) {
-                input.value = prompt;
-                input.focus();
+            function syncChatViewport() {
+                const isChatVisible = !chatSection.classList.contains("hidden");
+                mainEl.classList.toggle("bloom-chat-active", isChatVisible);
             }
-        }
+
+            syncChatViewport();
+            const observer = new MutationObserver(syncChatViewport);
+            observer.observe(chatSection, { attributes: true, attributeFilter: ["class"] });
+        })();
     </script>
     <script src="script.js"></script>
 </body>

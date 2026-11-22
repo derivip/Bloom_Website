@@ -49,7 +49,6 @@ async function fetchTasks() {
         const progressText = document.getElementById('task-progress-text');
         if (progressBar) progressBar.style.width = '0%';
         if (progressText) progressText.innerText = '0%';
-        renderWeeklyProgressChart();
         return;
     }
 
@@ -60,7 +59,6 @@ async function fetchTasks() {
 
     if (error) {
         console.error('Error fetching tasks:', error);
-        renderWeeklyProgressChart();
         return;
     }
     tasks = data || [];
@@ -68,7 +66,7 @@ async function fetchTasks() {
 }
 
 async function handleAddTask(e) {
-    if (e && e.preventDefault) e.preventDefault();
+    e.preventDefault();
 
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session) {
@@ -109,27 +107,26 @@ async function handleAddTask(e) {
 }
 
 async function toggleTask(id) {
-    const taskToToggle = tasks.find(t => String(t.id) === String(id));
+    const taskToToggle = tasks.find(t => t.id === id);
     if (!taskToToggle) return;
 
     const { error } = await supabaseClient
         .from('tasks')
         .update({ completed: !taskToToggle.completed })
         .eq('id', id);
-
+    
+const completionMap = JSON.parse(localStorage.getItem('bloom_task_completed_dates') || '{}');
+if (!taskToToggle.completed) {
+    completionMap[String(id)] = new Date().toISOString();
+} else {
+    delete completionMap[String(id)];
+}
+localStorage.setItem('bloom_task_completed_dates', JSON.stringify(completionMap));
+    
     if (error) {
         console.error('Error updating task:', error);
         return;
     }
-
-    const completionMap = JSON.parse(localStorage.getItem('bloom_task_completed_dates') || '{}');
-    if (!taskToToggle.completed) {
-        completionMap[String(id)] = new Date().toISOString();
-    } else {
-        delete completionMap[String(id)];
-    }
-    localStorage.setItem('bloom_task_completed_dates', JSON.stringify(completionMap));
-
     fetchTasks();
 }
 
@@ -162,22 +159,6 @@ function filterTasks(priority) {
     renderTasks();
 }
 
-function elaborateTaskStepsWithBloomAI(taskTitle, stepsElementId) {
-    const stepsBox = document.getElementById(stepsElementId);
-    const stepsText = stepsBox ? stepsBox.innerText.trim() : '';
-    const prompt = stepsText
-        ? `Elaborate on these micro-steps for "${taskTitle}":\n${stepsText}\n\nGive concrete examples, quick tips, and a simple way to tackle step 1 right now.`
-        : `Elaborate on how to break down and start "${taskTitle}" with clear, practical micro-steps and examples.`;
-
-    switchTab('chat');
-
-    const input = document.getElementById('chat-input');
-    if (input) {
-        input.value = prompt;
-        input.focus();
-    }
-}
-
 // --- GEMINI AI MICRO-STEPS FOR TASKS ---
 async function fetchAiMicroSteps(taskTitle, elementId) {
     const container = document.getElementById(elementId);
@@ -202,6 +183,7 @@ async function fetchAiMicroSteps(taskTitle, elementId) {
         const stepsText = cleanModelMarkdown(rawSteps);
         const escapedTitle = escapeJsSingleQuote(taskTitle);
 
+       
         container.innerHTML = `
             <div class="mt-3 p-3.5 rounded-xl bg-slate-950/90 border border-teal-500/30 text-xs space-y-2 shadow-inner">
                 <div class="flex items-center justify-between flex-wrap gap-2">
@@ -212,16 +194,14 @@ async function fetchAiMicroSteps(taskTitle, elementId) {
                         </span>
                         <span class="text-[10px] font-semibold bg-teal-500/15 text-teal-300 px-2 py-0.5 rounded border border-teal-500/30">Bloom AI</span>
                     </div>
-                    <div class="flex items-center gap-3">
-                        <button type="button" onclick="elaborateTaskStepsWithBloomAI('${escapedTitle}', '${elementId}')" class="text-[11px] text-rose-300 hover:text-rose-200 font-semibold flex items-center gap-1 transition-colors">
-                            <i data-lucide="sparkles" class="w-3 h-3"></i>
-                            <span>Elaborate with Bloom AI</span>
-                        </button>
-                        <button type="button" onclick="fetchAiMicroSteps('${escapedTitle}', '${elementId}')" class="text-[11px] text-slate-400 hover:text-teal-300 flex items-center gap-1 transition-colors">
-                            <i data-lucide="refresh-cw" class="w-3 h-3"></i>
-                            <span>Regenerate with AI</span>
-                        </button>
-                    </div>
+                    <button type="button" onclick="fetchAiMicroSteps('${escapedTitle}', '${elementId}')" class="text-[11px] text-slate-400 hover:text-teal-300 flex items-center gap-1 transition-colors">
+                        <i data-lucide="refresh-cw" class="w-3 h-3"></i>
+                        <span>Regenerate with AI</span>
+                    </button>
+                    <button type="button" onclick="elaborateTaskStepsWithBloomAI('${escapedTitle}', '${elementId}')" class="text-[11px] text-rose-300 hover:text-rose-200 font-semibold flex items-center gap-1 transition-colors">
+    <i data-lucide="sparkles" class="w-3 h-3"></i>
+    <span>Elaborate with Bloom AI</span>
+</button>
                 </div>
                 <div class="text-slate-200 leading-relaxed whitespace-pre-line">${escapeHtml(stepsText)}</div>
             </div>
@@ -262,165 +242,47 @@ function renderTasks() {
                 <p class="text-slate-400 text-sm">No tasks found. Relax or add a new goal!</p>
             </div>
         `;
-    } else {
-        const priorityBadges = {
-            high: '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-500/20 text-red-300 border border-red-500/30">HIGH</span>',
-            medium: '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">MEDIUM</span>',
-            low: '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">LOW</span>'
-        };
+        return;
+    }
 
-        container.innerHTML = filtered.map(t => {
-            const escapedTitle = escapeJsSingleQuote(t.title);
-            const escapedId = escapeJsSingleQuote(String(t.id));
-            return `
-            <div class="p-4 rounded-2xl bg-slate-900/80 border ${t.completed ? 'border-slate-800 opacity-60' : 'border-white/10'} transition-all hover:border-white/20 bloom-subtle-card">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center space-x-3">
-                        <button type="button" onclick="toggleTask('${escapedId}')" class="p-1 rounded-lg ${t.completed ? 'bg-rose-500 text-white' : 'border border-slate-600 hover:border-rose-400'}">
-                            <i data-lucide="${t.completed ? 'check-square' : 'square'}" class="w-5 h-5"></i>
-                        </button>
-                        <div>
-                            <p class="text-sm font-semibold text-white ${t.completed ? 'line-through text-slate-500' : ''}">${escapeHtml(t.title)}</p>
-                            <span class="text-xs text-slate-400">${escapeHtml(t.category)}</span>
-                        </div>
-                    </div>
-                    <div class="flex items-center space-x-3">
-                        ${priorityBadges[t.priority] || priorityBadges.medium}
-                        <button type="button" onclick="deleteTask('${escapedId}')" class="text-slate-500 hover:text-red-400 p-1">
-                            <i data-lucide="trash-2" class="w-4 h-4"></i>
-                        </button>
+    const priorityBadges = {
+        high: '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-500/20 text-red-300 border border-red-500/30">HIGH</span>',
+        medium: '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">MEDIUM</span>',
+        low: '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">LOW</span>'
+    };
+
+    container.innerHTML = filtered.map(t => {
+        const escapedTitle = escapeJsSingleQuote(t.title);
+        return `
+        <div class="p-4 rounded-2xl bg-slate-900/80 border ${t.completed ? 'border-slate-800 opacity-60' : 'border-white/10'} transition-all hover:border-white/20 bloom-subtle-card">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <button type="button" onclick="toggleTask(${t.id})" class="p-1 rounded-lg ${t.completed ? 'bg-rose-500 text-white' : 'border border-slate-600 hover:border-rose-400'}">
+                        <i data-lucide="${t.completed ? 'check-square' : 'square'}" class="w-5 h-5"></i>
+                    </button>
+                    <div>
+                        <p class="text-sm font-semibold text-white ${t.completed ? 'line-through text-slate-500' : ''}">${escapeHtml(t.title)}</p>
+                        <span class="text-xs text-slate-400">${escapeHtml(t.category)}</span>
                     </div>
                 </div>
-                <div id="ai-steps-${t.id}" class="mt-2 pt-2 border-t border-white/5">
-                    <button type="button" onclick="fetchAiMicroSteps('${escapedTitle}', 'ai-steps-${t.id}')" class="text-xs text-teal-400 hover:text-teal-300 font-medium flex items-center gap-1.5 transition-colors">
-                        <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
-                        <span>Generate BloomAI Micro-Steps</span>
+                <div class="flex items-center space-x-3">
+                    ${priorityBadges[t.priority] || priorityBadges.medium}
+                    <button type="button" onclick="deleteTask(${t.id})" class="text-slate-500 hover:text-red-400 p-1">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
                     </button>
                 </div>
             </div>
-            `;
-        }).join('');
-    }
-
-    renderWeeklyProgressChart();
-    if (window.lucide) lucide.createIcons();
-}
-
-// --- WEEKLY PROGRESS CHART & SUMMARY ---
-function toLocalDateKey(dateInput) {
-    const d = new Date(dateInput);
-    if (Number.isNaN(d.getTime())) return '';
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-}
-
-function getWeeklyTaskStats() {
-    const completionMap = JSON.parse(localStorage.getItem('bloom_task_completed_dates') || '{}');
-    const days = [];
-    const now = new Date();
-
-    for (let i = 6; i >= 0; i--) {
-        const d = new Date(now);
-        d.setDate(now.getDate() - i);
-        days.push({
-            key: toLocalDateKey(d),
-            label: d.toLocaleDateString('en-US', { weekday: 'short' }),
-            completed: 0,
-            added: 0
-        });
-    }
-
-    const dayLookup = Object.fromEntries(days.map(d => [d.key, d]));
-    const categoryCounts = {};
-    let weeklyCompleted = 0;
-    let weeklyAdded = 0;
-
-    tasks.forEach(t => {
-        const createdKey = t.created_at ? toLocalDateKey(t.created_at) : '';
-        if (dayLookup[createdKey]) {
-            dayLookup[createdKey].added += 1;
-            weeklyAdded += 1;
-        }
-
-        if (t.completed) {
-            const rawDoneDate = completionMap[String(t.id)] || t.completed_at || t.created_at;
-            const doneKey = rawDoneDate ? toLocalDateKey(rawDoneDate) : '';
-            if (dayLookup[doneKey]) {
-                dayLookup[doneKey].completed += 1;
-                weeklyCompleted += 1;
-                const cat = t.category || 'General';
-                categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
-            }
-        }
-    });
-
-    const topCategoryEntry = Object.entries(categoryCounts).sort((a, b) => b[1] - a[1])[0];
-    const topCategory = topCategoryEntry ? `${topCategoryEntry[0]} (${topCategoryEntry[1]})` : 'None yet';
-    const bestDay = [...days].sort((a, b) => b.completed - a.completed)[0];
-    const bestDayText = bestDay && bestDay.completed > 0 ? `${bestDay.label} (${bestDay.completed})` : '—';
-
-    return { days, weeklyCompleted, weeklyAdded, topCategory, bestDayText };
-}
-
-function renderWeeklyProgressChart() {
-    const chartEl = document.getElementById('weekly-progress-chart');
-    const summaryEl = document.getElementById('weekly-work-summary');
-    if (!chartEl || !summaryEl) return;
-
-    const { days, weeklyCompleted, weeklyAdded, topCategory, bestDayText } = getWeeklyTaskStats();
-    const maxCount = Math.max(1, ...days.map(d => Math.max(d.completed, d.added)));
-
-    chartEl.innerHTML = days.map(d => {
-        const heightPct = d.completed > 0 ? Math.max(18, Math.round((d.completed / maxCount) * 100)) : 8;
-        const barColor = d.completed > 0
-            ? 'bg-gradient-to-t from-rose-500 to-teal-400'
-            : 'bg-slate-800';
-        return `
-            <div class="flex flex-col items-center justify-end h-full gap-1.5 pb-2" title="${escapeHtml(d.label)}: ${d.completed} completed, ${d.added} added">
-                <span class="text-[10px] font-bold ${d.completed > 0 ? 'text-teal-300' : 'text-slate-500'}">${d.completed}</span>
-                <div class="w-full max-w-[28px] rounded-t-lg transition-all duration-300 ${barColor}" style="height: ${heightPct}%;"></div>
-                <span class="text-[10px] text-slate-400 font-medium">${escapeHtml(d.label)}</span>
+            <div id="ai-steps-${t.id}" class="mt-2 pt-2 border-t border-white/5">
+                <button type="button" onclick="fetchAiMicroSteps('${escapedTitle}', 'ai-steps-${t.id}')" class="text-xs text-teal-400 hover:text-teal-300 font-medium flex items-center gap-1.5 transition-colors">
+                    <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                    <span>Generate BloomAI Micro-Steps</span>
+                </button>
             </div>
+        </div>
         `;
     }).join('');
 
-    summaryEl.innerHTML = `
-        <div class="p-3 rounded-xl bg-slate-950/70 border border-white/5">
-            <span class="text-slate-400 block text-[11px]">Completed (7 Days)</span>
-            <span class="text-white font-bold text-sm mt-0.5 block">${weeklyCompleted} / ${weeklyAdded || weeklyCompleted} tasks</span>
-        </div>
-        <div class="p-3 rounded-xl bg-slate-950/70 border border-white/5">
-            <span class="text-slate-400 block text-[11px]">Top Focus Area</span>
-            <span class="text-teal-300 font-bold text-sm mt-0.5 block">${escapeHtml(topCategory)}</span>
-        </div>
-        <div class="p-3 rounded-xl bg-slate-950/70 border border-white/5">
-            <span class="text-slate-400 block text-[11px]">Most Productive Day</span>
-            <span class="text-rose-300 font-bold text-sm mt-0.5 block">${escapeHtml(bestDayText)}</span>
-        </div>
-    `;
-}
-
-function summarizeWeeklyWorkWithBloomAI() {
-    const { days, weeklyCompleted, weeklyAdded, topCategory, bestDayText } = getWeeklyTaskStats();
-    const dailyBreakdown = days.map(d => `${d.label}: ${d.completed} completed (${d.added} added)`).join(', ');
-    const openTasks = tasks.filter(t => !t.completed).slice(0, 5).map(t => `- ${t.title} [${t.priority}]`).join('\n');
-
-    const prompt = `Review my 7-day task progress and give me an encouraging, practical work summary:\n` +
-        `• Completed this week: ${weeklyCompleted} (Added: ${weeklyAdded})\n` +
-        `• Top category: ${topCategory}\n` +
-        `• Best day: ${bestDayText}\n` +
-        `• Daily breakdown: ${dailyBreakdown}\n` +
-        (openTasks ? `\nRemaining open tasks:\n${openTasks}\n` : '') +
-        `\nHighlight what went well, spot any patterns, and suggest 1 realistic priority for tomorrow.`;
-
-    switchTab('chat');
-    const input = document.getElementById('chat-input');
-    if (input) {
-        input.value = prompt;
-        input.focus();
-    }
+    if (window.lucide) lucide.createIcons();
 }
 
 // POP CULTURE / MOVIE INSPIRATIONAL QUOTES (30s Rotation)
@@ -476,8 +338,7 @@ function switchTab(tabId) {
     const mainEl = document.getElementById('main-content');
 
     if (activeView) activeView.classList.remove('hidden');
-    if (mainEl) mainEl.classList.toggle('bloom-chat-active', tabId === 'chat');
-    document.body.classList.toggle('overflow-hidden', tabId === 'chat');
+    if (mainEl) mainEl.classList.toggle('bloom-chat-active', tabId === 'chat'); document.body.classList.toggle('overflow-hidden', tabId === 'chat');
     if (activeNav) {
         activeNav.classList.add('bg-white/15', 'text-white');
         activeNav.classList.remove('text-slate-400');
@@ -512,9 +373,9 @@ const learningData = {
             title: 'Balancing High School & Late Night Shifts',
             desc: 'Practical strategies to communicate with managers about homework deadlines, protect sleep, and avoid shift burnout.',
             type: 'Article + Video + Podcast • 4 min read',
-            videoPath: 'videos/balancing-high-school-late-night-shifts.mp4.mp4',
-            podcastPath: 'https://xmqmrkqyjnbupyalhnib.supabase.co/storage/v1/object/public/guidance_media/podcasts/balancing-high-school-late-night-shifts.m4a.m4a',
-            transcriptPath: 'videos/Studying With a Job_Transcript.txt',
+           videoPath: 'videos/balancing-high-school-late-shifts.mp4.mp4',
+            podcastPath: 'https://xmqmrkqyjnbupyalhnib.supabase.co/storage/v1/object/public/guidance_media/podcasts/balancing-high-school-late-shifts.m4a.m4a',
+        transcriptPath: 'videos/Studying With a Job_Transcript.txt', // <-- Match the exact full filename in your bucket root!
             bloomPrompt: `Walk me through "Balancing High School & Late Night Shifts" in a warm, conversational way. Break down realistic habits for handling schoolwork, late shifts, and energy without burning out, and ask how it fits my week.`
         },
         {
@@ -900,6 +761,7 @@ function stopVoiceUI() {
     if (input) input.placeholder = "Ask Bloom anything...";
 }
 
+// Clean stray model bracket/asterisk artifacts outside code fences & tables
 function cleanModelMarkdown(rawText) {
     let text = String(rawText ?? '').trim();
     if (!text) return '';
@@ -927,7 +789,7 @@ function formatAiMessageContent(rawText) {
     if (!cleaned) return '<p>No response returned.</p>';
 
     const mermaidBlocks = [];
-    let processedText = cleaned.replace(/```mermaid\s*([\s\S]*?)```/g, (_match, code) => {
+    let processedText = cleaned.replace(/```mermaid\s*([\s\S]*?)```/g, (match, code) => {
         const placeholder = `%%MERMAID_BLOCK_${mermaidBlocks.length}%%`;
         mermaidBlocks.push(`
             <div class="my-3 p-4 rounded-2xl bg-slate-950 border border-rose-500/30 overflow-x-auto shadow-inner">
@@ -945,41 +807,66 @@ function formatAiMessageContent(rawText) {
     try {
         html = window.marked
             ? marked.parse(processedText, { breaks: true, gfm: true })
-            : `<p>${escapeHtml(processedText).replace(/\n/g, '<br>')}</p>`;
+            : escapeHtml(processedText).replace(/\n/g, '<br>');
     } catch {
-        html = `<p>${escapeHtml(processedText).replace(/\n/g, '<br>')}</p>`;
+        html = escapeHtml(processedText).replace(/\n/g, '<br>');
     }
 
-    mermaidBlocks.forEach((block, idx) => {
-        html = html.replace(`%%MERMAID_BLOCK_${idx}%%`, block);
+    html = html
+        .replace(/<table>/g, '<div class="my-3 overflow-x-auto rounded-xl border border-white/10"><table class="w-full text-left text-xs border-collapse">')
+        .replace(/<\/table>/g, '</table></div>')
+        .replace(/<thead>/g, '<thead class="bg-slate-900/90 text-rose-300 uppercase text-[11px]">')
+        .replace(/<th>/g, '<th class="p-2.5 border-b border-white/10 font-semibold whitespace-nowrap">')
+        .replace(/<td>/g, '<td class="p-2.5 border-b border-white/5 text-slate-200 align-top">')
+        .replace(/<h1>/g, '<h1 class="text-lg font-bold text-white mt-3 mb-1.5">')
+        .replace(/<h2>/g, '<h2 class="text-base font-bold text-rose-300 mt-3 mb-1.5">')
+        .replace(/<h3>/g, '<h3 class="text-sm font-bold text-white mt-2.5 mb-1">')
+        .replace(/<ul>/g, '<ul class="list-disc pl-5 my-2 space-y-1">')
+        .replace(/<ol>/g, '<ol class="list-decimal pl-5 my-2 space-y-1">')
+        .replace(/<p>/g, '<p class="mb-2 last:mb-0">');
+
+    mermaidBlocks.forEach((block, i) => {
+        html = html.replace(`%%MERMAID_BLOCK_${i}%%`, block);
     });
 
     return html;
 }
 
-// --- MULTI-CHAT SESSIONS WITH SUPABASE ---
-let activeChatSessionId = null;
+async function renderDiagramsInChat() {
+    if (window.mermaid) {
+        try {
+            await mermaid.run({ querySelector: '#chat-messages .mermaid' });
+        } catch (err) {
+            console.warn("Diagram render warning:", err);
+        }
+    }
+}
+
+// --- EXPLORE BLOOM AI MULTI-CHAT SYSTEM ---
+let currentSessionId = null;
 let chatSessions = [];
+let isSendingMessage = false;
 
 async function loadChatSessions() {
     const { data: { session } } = await supabaseClient.auth.getSession();
     const listContainer = document.getElementById('chat-sessions-list');
-    const chatBox = document.getElementById('chat-messages');
+    const chatContainer = document.getElementById('chat-messages');
 
     if (!session) {
-        if (listContainer) listContainer.innerHTML = `<p class="text-xs text-slate-500 p-2 text-center">Sign in to save chat history</p>`;
-        if (chatBox) {
-            chatBox.innerHTML = `
-                <div class="flex items-start space-x-3">
-                    <div class="w-8 h-8 rounded-full bg-rose-500/20 flex items-center justify-center border border-rose-500/40 shrink-0">
-                        <i data-lucide="bot" class="w-4 h-4 text-rose-400"></i>
-                    </div>
-                    <div class="p-4 rounded-2xl rounded-tl-sm bg-slate-900 border border-white/10 text-sm text-slate-200 max-w-[85%] bloom-chat-bubble-ai">
-                        Hey! I'm BloomAI. You can chat with me right now, or log in to save multiple chat threads across devices.
-                    </div>
+        chatSessions = [];
+        currentSessionId = null;
+        if (listContainer) {
+            listContainer.innerHTML = `<p class="text-xs text-slate-400 p-2">Log in to save and switch between chats.</p>`;
+        }
+        if (chatContainer) {
+            chatContainer.innerHTML = `
+                <div class="text-center py-12 space-y-3">
+                    <p class="text-slate-400 text-sm">Please log in to chat with Bloom AI.</p>
+                    <button type="button" onclick="switchTab('auth')" class="px-4 py-2 rounded-xl bg-rose-500 text-white text-xs font-semibold hover:bg-rose-600 transition-colors">
+                        Log In Now
+                    </button>
                 </div>
             `;
-            if (window.lucide) lucide.createIcons();
         }
         return;
     }
@@ -990,20 +877,16 @@ async function loadChatSessions() {
         .order('created_at', { ascending: false });
 
     if (error) {
-        console.error('Error loading chat sessions:', error);
+        console.error("Error loading chat sessions:", error);
         return;
     }
 
     chatSessions = data || [];
     renderChatSessionsList();
 
-    if (chatSessions.length > 0) {
-        if (!activeChatSessionId || !chatSessions.some(s => s.id === activeChatSessionId)) {
-            await selectChatSession(chatSessions[0].id);
-        } else {
-            await selectChatSession(activeChatSessionId);
-        }
-    } else {
+    if (chatSessions.length > 0 && !currentSessionId) {
+        selectChatSession(chatSessions[0].id);
+    } else if (chatSessions.length === 0) {
         await createNewChatSession();
     }
 }
@@ -1013,495 +896,575 @@ function renderChatSessionsList() {
     if (!listContainer) return;
 
     if (chatSessions.length === 0) {
-        listContainer.innerHTML = `<p class="text-xs text-slate-500 p-2 text-center">No chats yet.</p>`;
+        listContainer.innerHTML = `<p class="text-xs text-slate-500 px-2 py-1">No chats yet.</p>`;
         return;
     }
 
-    listContainer.innerHTML = chatSessions.map(s => {
-        const isActive = s.id === activeChatSessionId;
-        const safeTitle = escapeHtml(s.title || 'New Chat');
-        return `
-            <div class="group flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-colors ${isActive ? 'bg-rose-500/20 border border-rose-500/40 text-white' : 'hover:bg-white/5 text-slate-400 border border-transparent'}" onclick="selectChatSession('${s.id}')">
-                <div class="flex items-center gap-2 truncate pr-1 flex-1">
-                    <i data-lucide="message-square" class="w-3.5 h-3.5 shrink-0 ${isActive ? 'text-rose-400' : 'text-slate-500'}"></i>
-                    <span class="text-xs font-medium truncate">${safeTitle}</span>
-                </div>
-                <button type="button" onclick="event.stopPropagation(); deleteChatSession('${s.id}')" class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 p-1 rounded transition-opacity" title="Delete chat">
-                    <i data-lucide="trash-2" class="w-3 h-3"></i>
-                </button>
-            </div>
-        `;
-    }).join('');
+    listContainer.innerHTML = chatSessions.map(s => `
+        <div onclick="selectChatSession('${escapeJsSingleQuote(s.id)}')" class="group flex items-center justify-between p-2.5 rounded-xl text-xs font-medium cursor-pointer transition-all ${s.id === currentSessionId ? 'bg-rose-500/20 border border-rose-500/40 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'}">
+            <span class="truncate max-w-[160px]">${escapeHtml(s.title)}</span>
+            <button type="button" onclick="deleteChatSession(event, '${escapeJsSingleQuote(s.id)}')" class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-rose-400 p-1 transition-opacity" title="Delete chat">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            </button>
+        </div>
+    `).join('');
     if (window.lucide) lucide.createIcons();
 }
 
 async function createNewChatSession() {
     const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session) return;
+    if (!session) {
+        alert("Please log in to create a chat.");
+        switchTab('auth');
+        return;
+    }
 
     const { data, error } = await supabaseClient
         .from('chat_sessions')
-        .insert([{ title: 'New Chat', user_id: session.user.id }])
+        .insert([{ user_id: session.user.id, title: 'New Conversation' }])
         .select()
         .single();
 
     if (error) {
-        console.error('Error creating chat session:', error);
+        console.error("Error creating session:", error);
         return;
     }
 
-    activeChatSessionId = data.id;
     chatSessions.unshift(data);
+    selectChatSession(data.id);
     renderChatSessionsList();
-    renderWelcomeMessage();
 }
 
-async function deleteChatSession(sessionId) {
+async function selectChatSession(sessionId) {
+    currentSessionId = sessionId;
+    renderChatSessionsList();
+
+    const activeSession = chatSessions.find(s => s.id === sessionId);
+    const titleEl = document.getElementById('active-chat-title');
+    if (titleEl && activeSession) {
+        titleEl.innerText = activeSession.title;
+    }
+
+    const chatContainer = document.getElementById('chat-messages');
+    if (!chatContainer) return;
+
+    chatContainer.innerHTML = `<div class="text-center text-xs text-slate-500 py-4">Loading conversation...</div>`;
+
+    const { data, error } = await supabaseClient
+        .from('chat_messages')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('created_at', { ascending: true });
+
+    if (error || !data || data.length === 0) {
+        chatContainer.innerHTML = `
+            <div class="flex items-start space-x-3">
+                <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
+                    <i data-lucide="flower-2" class="w-4 h-4"></i>
+                </div>
+                <div class="bloom-chat-bubble-ai bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 text-sm leading-relaxed">
+                    Hey there. 👋 I’m Bloom. Ask me anything, upload an image or file, or ask me to create a visual roadmap!
+                </div>
+            </div>
+        `;
+    } else {
+        chatContainer.innerHTML = data.map(m => {
+            if (m.role === 'user') {
+                return `
+                    <div class="flex items-start justify-end space-x-3">
+                        <div class="bg-rose-600 text-white p-4 rounded-2xl rounded-tr-none max-w-[85%] text-sm leading-relaxed shadow-md whitespace-pre-wrap">
+                            ${escapeHtml(m.content)}
+                        </div>
+                    </div>
+                `;
+            } else {
+                return `
+                    <div class="flex items-start space-x-3">
+                        <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
+                            <i data-lucide="flower-2" class="w-4 h-4"></i>
+                        </div>
+                        <div class="bloom-chat-bubble-ai bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 text-sm leading-relaxed">
+                            ${formatAiMessageContent(m.content)}
+                        </div>
+                    </div>
+                `;
+            }
+        }).join('');
+    }
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+    if (window.lucide) lucide.createIcons();
+    await renderDiagramsInChat();
+}
+
+async function deleteChatSession(event, sessionId) {
+    event.stopPropagation();
+    if (!confirm("Delete this chat conversation?")) return;
+
     const { error } = await supabaseClient
         .from('chat_sessions')
         .delete()
         .eq('id', sessionId);
 
     if (error) {
-        console.error('Error deleting session:', error);
+        console.error("Error deleting session:", error);
         return;
     }
 
     chatSessions = chatSessions.filter(s => s.id !== sessionId);
-    if (activeChatSessionId === sessionId) {
-        activeChatSessionId = chatSessions.length > 0 ? chatSessions[0].id : null;
-    }
-
-    renderChatSessionsList();
-    if (activeChatSessionId) {
-        await selectChatSession(activeChatSessionId);
-    } else {
-        await createNewChatSession();
-    }
-}
-
-async function selectChatSession(sessionId) {
-    activeChatSessionId = sessionId;
-    renderChatSessionsList();
-
-    const chatBox = document.getElementById('chat-messages');
-    if (!chatBox) return;
-
-    chatBox.innerHTML = `<div class="text-center py-6 text-xs text-slate-500 animate-pulse">Loading conversation...</div>`;
-
-    const { data: messages, error } = await supabaseClient
-        .from('chat_messages')
-        .select('*')
-        .eq('session_id', sessionId)
-        .order('created_at', { ascending: true });
-
-    if (error) {
-        console.error('Error loading messages:', error);
-        chatBox.innerHTML = `<div class="text-center py-6 text-xs text-red-400">Failed to load messages.</div>`;
-        return;
-    }
-
-    chatBox.innerHTML = '';
-    if (!messages || messages.length === 0) {
-        renderWelcomeMessage();
-    } else {
-        messages.forEach(m => {
-            appendMessageToDOM(m.role, m.content, m.attachment_names || []);
-        });
-    }
-    chatBox.scrollTop = chatBox.scrollHeight;
-}
-
-function renderWelcomeMessage() {
-    const chatBox = document.getElementById('chat-messages');
-    if (!chatBox) return;
-    chatBox.innerHTML = `
-        <div class="flex items-start space-x-3">
-            <div class="w-8 h-8 rounded-full bg-rose-500/20 flex items-center justify-center border border-rose-500/40 shrink-0">
-                <i data-lucide="bot" class="w-4 h-4 text-rose-400"></i>
-            </div>
-            <div class="p-4 rounded-2xl rounded-tl-sm bg-slate-900 border border-white/10 text-sm text-slate-200 max-w-[85%] bloom-chat-bubble-ai">
-                Hey! I'm BloomAI. How are you feeling today? Ask me about goals, school/work balance, stress, or attach a file/image to analyze.
-            </div>
-        </div>
-    `;
-    if (window.lucide) lucide.createIcons();
-}
-
-function appendMessageToDOM(role, text, attachmentNames = []) {
-    const chatBox = document.getElementById('chat-messages');
-    if (!chatBox) return;
-
-    const isUser = role === 'user';
-    const wrapper = document.createElement('div');
-    wrapper.className = `flex items-start space-x-3 ${isUser ? 'justify-end' : ''}`;
-
-    let attachmentsHtml = '';
-    if (attachmentNames && attachmentNames.length > 0) {
-        attachmentsHtml = `<div class="flex flex-wrap gap-1.5 mb-2">` +
-            attachmentNames.map(name => `<span class="inline-flex items-center gap-1 text-[11px] bg-black/30 px-2 py-0.5 rounded border border-white/10"><i data-lucide="paperclip" class="w-3 h-3"></i>${escapeHtml(name)}</span>`).join('') +
-            `</div>`;
-    }
-
-    const bodyHtml = isUser
-        ? `${attachmentsHtml}<div class="whitespace-pre-wrap">${escapeHtml(text)}</div>`
-        : `${attachmentsHtml}<div class="bloom-markdown">${formatAiMessageContent(text)}</div>`;
-
-    if (isUser) {
-        wrapper.innerHTML = `
-            <div class="p-4 rounded-2xl rounded-tr-sm bg-rose-500 text-white text-sm max-w-[85%] shadow-md bloom-chat-bubble-user">
-                ${bodyHtml}
-            </div>
-        `;
-    } else {
-        wrapper.innerHTML = `
-            <div class="w-8 h-8 rounded-full bg-rose-500/20 flex items-center justify-center border border-rose-500/40 shrink-0">
-                <i data-lucide="bot" class="w-4 h-4 text-rose-400"></i>
-            </div>
-            <div class="p-4 rounded-2xl rounded-tl-sm bg-slate-900 border border-white/10 text-sm text-slate-200 max-w-[85%] space-y-2 bloom-chat-bubble-ai">
-                <div class="flex items-center justify-between gap-2 pb-1 border-b border-white/5">
-                    <span class="text-[10px] font-bold uppercase tracking-wider text-rose-400">Bloom AI</span>
-                    <span class="text-[10px] text-slate-500">AI-generated guidance</span>
-                </div>
-                ${bodyHtml}
-            </div>
-        `;
-    }
-
-    chatBox.appendChild(wrapper);
-    chatBox.scrollTop = chatBox.scrollHeight;
-    if (window.lucide) lucide.createIcons();
-    if (!isUser && window.mermaid) {
-        const mermaidNodes = wrapper.querySelectorAll('.mermaid');
-        if (mermaidNodes.length > 0) {
-            mermaid.run({ nodes: mermaidNodes }).catch(err => console.error('Mermaid render error:', err));
-        }
-    }
-}
-
-async function handleSendMessage(e) {
-    if (e && e.preventDefault) e.preventDefault();
-
-    const input = document.getElementById('chat-input');
-    const chatBox = document.getElementById('chat-messages');
-    if (!input || !chatBox) return;
-
-    const msg = input.value.trim();
-    const filesToSend = [...attachedFiles];
-    if (!msg && filesToSend.length === 0) return;
-
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    const displayText = msg || (filesToSend.length > 0 ? `[Attached ${filesToSend.length} file(s)]` : '');
-    const fileNames = filesToSend.map(f => f.name);
-
-    appendMessageToDOM('user', displayText, fileNames);
-    input.value = '';
-    attachedFiles = [];
-    renderAttachmentsPreview();
-
-    let currentSessionId = activeChatSessionId;
-    if (session) {
-        if (!currentSessionId) {
-            const { data: newSess } = await supabaseClient
-                .from('chat_sessions')
-                .insert([{ title: msg ? msg.slice(0, 32) : 'Attachment Chat', user_id: session.user.id }])
-                .select()
-                .single();
-            if (newSess) {
-                currentSessionId = newSess.id;
-                activeChatSessionId = newSess.id;
-                chatSessions.unshift(newSess);
-                renderChatSessionsList();
-            }
+    if (currentSessionId === sessionId) {
+        currentSessionId = null;
+        if (chatSessions.length > 0) {
+            selectChatSession(chatSessions[0].id);
         } else {
-            const currentSess = chatSessions.find(s => s.id === currentSessionId);
-            if (currentSess && currentSess.title === 'New Chat' && msg) {
-                const newTitle = msg.slice(0, 32) + (msg.length > 32 ? '...' : '');
-                await supabaseClient
-                    .from('chat_sessions')
-                    .update({ title: newTitle })
-                    .eq('id', currentSessionId);
-                currentSess.title = newTitle;
-                renderChatSessionsList();
-            }
+            await createNewChatSession();
         }
-
-        if (currentSessionId) {
-            await supabaseClient
-                .from('chat_messages')
-                .insert([{
-                    session_id: currentSessionId,
-                    user_id: session.user.id,
-                    role: 'user',
-                    content: displayText,
-                    attachment_names: fileNames
-                }]);
-        }
-    }
-
-    const typingId = 'typing-' + Date.now();
-    const typingEl = document.createElement('div');
-    typingEl.id = typingId;
-    typingEl.className = 'flex items-start space-x-3';
-    typingEl.innerHTML = `
-        <div class="w-8 h-8 rounded-full bg-rose-500/20 flex items-center justify-center border border-rose-500/40 shrink-0">
-            <i data-lucide="bot" class="w-4 h-4 text-rose-400"></i>
-        </div>
-        <div class="p-4 rounded-2xl rounded-tl-sm bg-slate-900 border border-white/10 text-sm text-slate-400 bloom-chat-bubble-ai">
-            <span class="animate-pulse">BloomAI is thinking...</span>
-        </div>
-    `;
-    chatBox.appendChild(typingEl);
-    chatBox.scrollTop = chatBox.scrollHeight;
-    if (window.lucide) lucide.createIcons();
-
-    try {
-        const systemPrompt = "You are BloomAI, a warm, empathetic, insightful mentor and life coach for youth and young adults. Give clear, practical, structured answers. Use clean markdown formatting and tables when comparing options. Only include a ```mermaid flowchart``` when mapping a multi-step roadmap, decision tree, or workflow.";
-
-        const payload = {
-            prompt: msg || "Please analyze the attached file(s) and share helpful insights.",
-            systemInstruction: systemPrompt,
-            files: filesToSend
-        };
-
-        const { data, error } = await supabaseClient.functions.invoke('gemini-proxy', {
-            body: payload
-        });
-
-        const typingNode = document.getElementById(typingId);
-        if (typingNode) typingNode.remove();
-
-        if (error) throw error;
-        if (data?.error) throw new Error(data.error.message || JSON.stringify(data.error));
-
-        const rawReply = data?.candidates?.[0]?.content?.parts?.[0]?.text
-            || data?.reply
-            || "I'm here with you! Could you share a little more detail?";
-        const reply = cleanModelMarkdown(rawReply);
-
-        appendMessageToDOM('assistant', reply);
-
-        if (session && currentSessionId) {
-            await supabaseClient
-                .from('chat_messages')
-                .insert([{
-                    session_id: currentSessionId,
-                    user_id: session.user.id,
-                    role: 'assistant',
-                    content: reply,
-                    attachment_names: []
-                }]);
-        }
-    } catch (err) {
-        console.error("Chat error:", err);
-        const typingNode = document.getElementById(typingId);
-        if (typingNode) typingNode.remove();
-
-        const errDiv = document.createElement('div');
-        errDiv.className = 'flex items-start space-x-3';
-        errDiv.innerHTML = `
-            <div class="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center border border-red-500/40 shrink-0">
-                <i data-lucide="alert-circle" class="w-4 h-4 text-red-400"></i>
-            </div>
-            <div class="p-4 rounded-2xl rounded-tl-sm bg-red-950/40 border border-red-500/30 text-sm text-red-200 max-w-[85%]">
-                BloomAI hit a snag: ${escapeHtml(err.message)}
-            </div>
-        `;
-        chatBox.appendChild(errDiv);
-        chatBox.scrollTop = chatBox.scrollHeight;
-        if (window.lucide) lucide.createIcons();
+    } else {
+        renderChatSessionsList();
     }
 }
 
 function sendQuickPrompt(promptText) {
     const input = document.getElementById('chat-input');
-    if (input) input.value = promptText;
+    if (!input) return;
+    input.value = promptText;
     handleSendMessage(new Event('submit'));
 }
 
-// --- SUPABASE AUTHENTICATION ---
+async function handleSendMessage(e) {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    if (isSendingMessage) return;
+
+    const input = document.getElementById('chat-input');
+    const text = input ? input.value.trim() : '';
+    if (!text && attachedFiles.length === 0) return;
+
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) {
+        alert("Please log in to chat.");
+        switchTab('auth');
+        return;
+    }
+
+    if (!currentSessionId) {
+        await createNewChatSession();
+    }
+
+    const chatContainer = document.getElementById('chat-messages');
+    const filesSnapshot = [...attachedFiles];
+    const attachedNames = filesSnapshot.map(f => f.name).join(', ');
+    const displayPrompt = text
+        ? (attachedNames ? `${text} [Attached: ${attachedNames}]` : text)
+        : `[Attached: ${attachedNames}]`;
+
+    if (input) input.value = '';
+    attachedFiles = [];
+    renderAttachmentsPreview();
+    isSendingMessage = true;
+
+    if (chatContainer) {
+        chatContainer.insertAdjacentHTML('beforeend', `
+            <div class="flex items-start justify-end space-x-3">
+                <div class="bg-rose-600 text-white p-4 rounded-2xl rounded-tr-none max-w-[85%] text-sm leading-relaxed shadow-md whitespace-pre-wrap">
+                    ${escapeHtml(displayPrompt)}
+                </div>
+            </div>
+        `);
+
+        chatContainer.insertAdjacentHTML('beforeend', `
+            <div id="bloom-typing-row" class="flex items-start space-x-3">
+                <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
+                    <i data-lucide="flower-2" class="w-4 h-4"></i>
+                </div>
+                <div class="bloom-chat-bubble-ai bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none text-slate-400 text-sm animate-pulse">
+                    Bloom is thinking...
+                </div>
+            </div>
+        `);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+        if (window.lucide) lucide.createIcons();
+    }
+
+    try {
+        await supabaseClient.from('chat_messages').insert([{
+            session_id: currentSessionId,
+            user_id: session.user.id,
+            role: 'user',
+            content: displayPrompt
+        }]);
+
+        const activeSession = chatSessions.find(s => s.id === currentSessionId);
+        if (activeSession && activeSession.title === 'New Conversation' && text) {
+            const shortTitle = text.slice(0, 36);
+            await supabaseClient
+                .from('chat_sessions')
+                .update({ title: shortTitle })
+                .eq('id', currentSessionId);
+            activeSession.title = shortTitle;
+            const titleEl = document.getElementById('active-chat-title');
+            if (titleEl) titleEl.innerText = shortTitle;
+            renderChatSessionsList();
+        }
+
+        const { data, error } = await supabaseClient.functions.invoke('gemini-proxy', {
+            body: {
+                prompt: text || 'Analyze the attached file(s).',
+                files: filesSnapshot
+            }
+        });
+
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error.message || JSON.stringify(data.error));
+
+        const rawReply =
+            data?.candidates?.[0]?.content?.parts?.[0]?.text
+            || data?.reply
+            || "I didn't receive a text response—please try again.";
+        const formattedHtml = formatAiMessageContent(rawReply);
+
+        document.getElementById('bloom-typing-row')?.remove();
+
+        if (chatContainer) {
+            chatContainer.insertAdjacentHTML('beforeend', `
+                <div class="flex items-start space-x-3">
+                    <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
+                        <i data-lucide="flower-2" class="w-4 h-4"></i>
+                    </div>
+                    <div class="bloom-chat-bubble-ai bg-slate-800/80 border border-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-slate-200 text-sm leading-relaxed">
+                        ${formattedHtml}
+                    </div>
+                </div>
+            `);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            if (window.lucide) lucide.createIcons();
+            await renderDiagramsInChat();
+        }
+
+        await supabaseClient.from('chat_messages').insert([{
+            session_id: currentSessionId,
+            user_id: session.user.id,
+            role: 'assistant',
+            content: rawReply
+        }]);
+    } catch (err) {
+        console.error("Chat error:", err);
+        document.getElementById('bloom-typing-row')?.remove();
+        if (chatContainer) {
+            chatContainer.insertAdjacentHTML('beforeend', `
+                <div class="flex items-start space-x-3">
+                    <div class="p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 shrink-0">
+                        <i data-lucide="alert-circle" class="w-4 h-4"></i>
+                    </div>
+                    <div class="bloom-chat-bubble-ai bg-slate-800/80 border border-rose-500/30 p-4 rounded-2xl rounded-tl-none max-w-[85%] text-rose-300 text-sm">
+                        Couldn't complete that request: ${escapeHtml(err.message)}
+                    </div>
+                </div>
+            `);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            if (window.lucide) lucide.createIcons();
+        }
+    } finally {
+        isSendingMessage = false;
+    }
+}
+
+// --- AUTHENTICATION ---
 let isSignUpMode = false;
 
 function toggleAuthMode() {
     isSignUpMode = !isSignUpMode;
     const titleEl = document.getElementById('auth-title');
+    const subtitleEl = document.getElementById('auth-subtitle');
     const submitBtn = document.getElementById('auth-submit-btn');
     const toggleBtn = document.getElementById('auth-toggle-btn');
 
-    if (titleEl) titleEl.textContent = isSignUpMode ? 'Create Account' : 'Welcome Back';
-    if (submitBtn) submitBtn.textContent = isSignUpMode ? 'Sign Up' : 'Sign In';
+    if (titleEl) titleEl.innerText = isSignUpMode ? 'Create Your Account' : 'Welcome Back';
+    if (subtitleEl) subtitleEl.innerText = isSignUpMode
+        ? 'Sign up to save tasks and Bloom AI chats.'
+        : 'Sign in to sync your tasks and Bloom AI chats.';
+    if (submitBtn) submitBtn.innerText = isSignUpMode ? 'Create Account' : 'Sign In';
     if (toggleBtn) {
         toggleBtn.innerHTML = isSignUpMode
             ? 'Already have an account? <span class="font-bold text-white">Sign In</span>'
-            : "Don't have an account? <span class="font-bold text-white">Sign Up</span>";
+            : "Don't have an account? <span class=\"font-bold text-white\">Sign Up</span>";
     }
 }
 
 async function handleAuthSubmit(e) {
     e.preventDefault();
-    const emailInput = document.getElementById('auth-email');
-    const passwordInput = document.getElementById('auth-password');
-    const errorBox = document.getElementById('auth-error');
-    const successBox = document.getElementById('auth-success');
-    if (!emailInput || !passwordInput) return;
+    const email = document.getElementById('auth-email')?.value.trim();
+    const password = document.getElementById('auth-password')?.value;
+    const errEl = document.getElementById('auth-error');
+    const okEl = document.getElementById('auth-success');
 
-    if (errorBox) errorBox.classList.add('hidden');
-    if (successBox) successBox.classList.add('hidden');
+    if (errEl) errEl.classList.add('hidden');
+    if (okEl) okEl.classList.add('hidden');
 
-    const email = emailInput.value.trim();
-    const password = passwordInput.value;
+    const res = isSignUpMode
+        ? await supabaseClient.auth.signUp({ email, password })
+        : await supabaseClient.auth.signInWithPassword({ email, password });
 
-    if (isSignUpMode) {
-        const { error } = await supabaseClient.auth.signUp({ email, password });
-        if (error) {
-            if (errorBox) { errorBox.textContent = error.message; errorBox.classList.remove('hidden'); }
-        } else if (successBox) {
-            successBox.textContent = 'Account created! Check your email or sign in.';
-            successBox.classList.remove('hidden');
+    if (res.error) {
+        if (errEl) {
+            errEl.textContent = res.error.message;
+            errEl.classList.remove('hidden');
         }
-    } else {
-        const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-        if (error) {
-            if (errorBox) { errorBox.textContent = error.message; errorBox.classList.remove('hidden'); }
-        } else {
-            emailInput.value = '';
-            passwordInput.value = '';
-            switchTab('home');
-        }
+        return;
     }
+
+    if (isSignUpMode && !res.data.session) {
+        if (okEl) {
+            okEl.textContent = 'Check your email to confirm your account, then sign in.';
+            okEl.classList.remove('hidden');
+        }
+        return;
+    }
+
+    switchTab('home');
 }
 
 async function handleForgotPassword() {
-    const emailInput = document.getElementById('auth-email');
-    const email = emailInput ? emailInput.value.trim() : '';
+    const email = document.getElementById('auth-email')?.value.trim();
+    const errEl = document.getElementById('auth-error');
+    const okEl = document.getElementById('auth-success');
+
     if (!email) {
-        alert('Enter your email address first.');
+        if (errEl) {
+            errEl.textContent = 'Enter your email address first.';
+            errEl.classList.remove('hidden');
+        }
         return;
     }
+
     const { error } = await supabaseClient.auth.resetPasswordForEmail(email);
-    if (error) alert(error.message);
-    else alert('Password reset link sent to your email.');
+    if (error && errEl) {
+        errEl.textContent = error.message;
+        errEl.classList.remove('hidden');
+    } else if (okEl) {
+        okEl.textContent = 'Password reset link sent to your email.';
+        okEl.classList.remove('hidden');
+    }
 }
 
 async function handleUpdatePassword(e) {
     e.preventDefault();
-    const newPwdInput = document.getElementById('new-password');
-    if (!newPwdInput) return;
-    const { error } = await supabaseClient.auth.updateUser({ password: newPwdInput.value });
-    if (error) alert(error.message);
-    else {
-        alert('Password updated!');
+    const password = document.getElementById('new-password')?.value;
+    const errEl = document.getElementById('reset-error');
+    const { error } = await supabaseClient.auth.updateUser({ password });
+    if (error && errEl) {
+        errEl.textContent = error.message;
+        errEl.classList.remove('hidden');
+    } else {
         document.getElementById('reset-password-form')?.classList.add('hidden');
         document.getElementById('auth-form')?.classList.remove('hidden');
+        switchTab('home');
     }
 }
 
-async function handleSignOut() {
-    await supabaseClient.auth.signOut();
-    activeChatSessionId = null;
-    chatSessions = [];
-    switchTab('auth');
-}
-
-function updateAuthUI(session) {
-    const authNavBtn = document.getElementById('auth-nav-btn');
-    if (!authNavBtn) return;
+async function syncAuthButton() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const btn = document.getElementById('auth-nav-btn');
+    if (!btn) return;
 
     if (session) {
-        authNavBtn.innerHTML = `<i data-lucide="log-out" class="w-4 h-4"></i><span>Sign Out</span>`;
-        authNavBtn.onclick = handleSignOut;
+        btn.innerHTML = `<i data-lucide="log-out" class="w-4 h-4"></i><span>Log Out</span>`;
+        btn.onclick = async () => {
+            await supabaseClient.auth.signOut();
+            switchTab('home');
+        };
     } else {
-        authNavBtn.innerHTML = `<i data-lucide="log-in" class="w-4 h-4"></i><span>Log In</span>`;
-        authNavBtn.onclick = () => switchTab('auth');
+        btn.innerHTML = `<i data-lucide="log-in" class="w-4 h-4"></i><span>Log In</span>`;
+        btn.onclick = () => switchTab('auth');
     }
     if (window.lucide) lucide.createIcons();
 }
 
-supabaseClient.auth.onAuthStateChange((_event, session) => {
-    updateAuthUI(session);
-    fetchTasks();
-    if (session && document.getElementById('view-chat') && !document.getElementById('view-chat').classList.contains('hidden')) {
-        loadChatSessions();
-    }
-});
-
-// --- FOCUS RADIO STREAM PLAYER ---
-let focusAudio = null;
-let isMusicPlaying = false;
-
-function ensureFocusAudio() {
-    const stationSelect = document.getElementById('music-station');
-    const volSlider = document.getElementById('music-volume');
-    if (!focusAudio) {
-        focusAudio = new Audio(stationSelect ? stationSelect.value : 'https://streams.ilovemusic.de/iloveradio17.mp3');
-        focusAudio.preload = 'none';
-    }
-    if (volSlider) {
-        focusAudio.volume = Math.max(0, Math.min(1, Number(volSlider.value) || 0.35));
-    }
-    return focusAudio;
-}
-
-function updateMusicIcon() {
-    const icon = document.getElementById('music-icon');
-    if (icon) icon.setAttribute('data-lucide', isMusicPlaying ? 'pause' : 'play');
-    if (window.lucide) lucide.createIcons();
-}
+// --- FOCUS RADIO ---
+let isPlayingMusic = false;
 
 function toggleMusic() {
-    const audio = ensureFocusAudio();
-    if (isMusicPlaying) {
+    const audio = document.getElementById('bg-audio');
+    const icon = document.getElementById('music-icon');
+    if (!audio) return;
+
+    if (isPlayingMusic) {
         audio.pause();
-        isMusicPlaying = false;
-        updateMusicIcon();
+        isPlayingMusic = false;
+        if (icon) icon.setAttribute('data-lucide', 'play');
     } else {
         audio.play().then(() => {
-            isMusicPlaying = true;
-            updateMusicIcon();
-        }).catch(err => {
-            console.error('Radio playback failed:', err);
-        });
+            isPlayingMusic = true;
+            if (icon) icon.setAttribute('data-lucide', 'pause');
+            if (window.lucide) lucide.createIcons();
+        }).catch(err => console.warn('Audio play blocked/error:', err));
     }
+    if (window.lucide) lucide.createIcons();
 }
 
 function changeStation() {
-    const stationSelect = document.getElementById('music-station');
-    if (!stationSelect) return;
-    const audio = ensureFocusAudio();
-    audio.src = stationSelect.value;
+    const select = document.getElementById('music-station');
+    const audio = document.getElementById('bg-audio');
+    const source = document.getElementById('bg-audio-source');
+    if (!select || !audio || !source) return;
+
+    source.src = select.value;
     audio.load();
-    if (isMusicPlaying) {
-        audio.play().catch(err => console.error('Station switch error:', err));
+    if (isPlayingMusic) {
+        audio.play().catch(err => console.warn('Station switch error:', err));
     }
 }
 
 function setMusicVolume(val) {
-    const audio = ensureFocusAudio();
-    audio.volume = Math.max(0, Math.min(1, Number(val) || 0));
+    const audio = document.getElementById('bg-audio');
+    if (audio) audio.volume = parseFloat(val);
 }
 
-// INITIALIZATION ON PAGE LOAD
+function handleAudioError() {
+    isPlayingMusic = false;
+    const icon = document.getElementById('music-icon');
+    if (icon) icon.setAttribute('data-lucide', 'play');
+    if (window.lucide) lucide.createIcons();
+}
+
+// --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', async () => {
     const taskForm = document.getElementById('task-form');
     if (taskForm) taskForm.addEventListener('submit', handleAddTask);
 
-    renderWeeklyProgressChart();
+    const volInput = document.getElementById('music-volume');
+    const audio = document.getElementById('bg-audio');
+    if (volInput && audio) audio.volume = parseFloat(volInput.value);
 
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    updateAuthUI(session);
+    supabaseClient.auth.onAuthStateChange((event) => {
+        syncAuthButton();
+        if (event === 'PASSWORD_RECOVERY') {
+            switchTab('auth');
+            document.getElementById('auth-form')?.classList.add('hidden');
+            document.getElementById('reset-password-form')?.classList.remove('hidden');
+        }
+    });
 
-    if (session) {
-        switchTab('home');
-    } else {
-        switchTab('auth');
-    }
-
-    const quoteEl = document.getElementById('inspirational-quote');
-    const sourceEl = document.getElementById('quote-source');
-    if (quoteEl && sourceEl) {
-        quoteEl.innerText = quotes[0].text;
-        sourceEl.innerText = `— ${quotes[0].source}`;
-    }
-
+    await syncAuthButton();
     if (window.lucide) lucide.createIcons();
 });
+
+ function elaborateTaskStepsWithBloomAI(taskTitle, stepsElementId) {
+    const stepsBox = document.getElementById(stepsElementId);
+    const stepsText = stepsBox ? stepsBox.innerText.trim() : '';
+    const prompt = stepsText
+        ? `Elaborate on these micro-steps for "${taskTitle}":\n${stepsText}\n\nGive concrete examples, quick tips, and a simple way to tackle step 1 right now.`
+        : `Elaborate on how to break down and start "${taskTitle}" with clear, practical micro-steps and examples.`;
+
+    if (typeof switchTab === 'function') {
+        switchTab('chat');
+    }
+
+    const input = document.getElementById('chat-input');
+    if (input) {
+        input.value = prompt;
+        input.focus();
+    }
+}
+
+function getWeeklyTaskStats() {
+    const completionMap = JSON.parse(localStorage.getItem('bloom_task_completed_dates') || '{}');
+    const days = [];
+    const now = new Date();
+
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(now.getDate() - i);
+        const key = d.toISOString().slice(0, 10);
+        const label = d.toLocaleDateString('en-US', { weekday: 'short' });
+        days.push({ key, label, completed: 0, added: 0 });
+    }
+
+    const dayLookup = Object.fromEntries(days.map(d => [d.key, d]));
+    const categoryCounts = {};
+    let weeklyCompleted = 0;
+    let weeklyAdded = 0;
+
+    tasks.forEach(t => {
+        const createdKey = t.created_at ? new Date(t.created_at).toISOString().slice(0, 10) : '';
+        if (dayLookup[createdKey]) {
+            dayLookup[createdKey].added += 1;
+            weeklyAdded += 1;
+        }
+
+        if (t.completed) {
+            const rawDoneDate = completionMap[String(t.id)] || t.completed_at || t.created_at;
+            const doneKey = rawDoneDate ? new Date(rawDoneDate).toISOString().slice(0, 10) : '';
+            if (dayLookup[doneKey]) {
+                dayLookup[doneKey].completed += 1;
+                weeklyCompleted += 1;
+                const cat = t.category || 'General';
+                categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+            }
+        }
+    });
+
+    const topCategoryEntry = Object.entries(categoryCounts).sort((a, b) => b[1] - a[1])[0];
+    const topCategory = topCategoryEntry ? `${topCategoryEntry[0]} (${topCategoryEntry[1]})` : 'None yet';
+    const bestDay = [...days].sort((a, b) => b.completed - a.completed)[0];
+    const bestDayText = bestDay && bestDay.completed > 0 ? `${bestDay.label} (${bestDay.completed})` : '—';
+
+    return { days, weeklyCompleted, weeklyAdded, topCategory, bestDayText };
+}
+
+function renderWeeklyProgressChart() {
+    const chartEl = document.getElementById('weekly-progress-chart');
+    const summaryEl = document.getElementById('weekly-work-summary');
+    if (!chartEl || !summaryEl) return;
+
+    const { days, weeklyCompleted, weeklyAdded, topCategory, bestDayText } = getWeeklyTaskStats();
+    const maxCount = Math.max(1, ...days.map(d => Math.max(d.completed, d.added)));
+
+    chartEl.innerHTML = days.map(d => {
+        const heightPct = d.completed > 0 ? Math.max(16, Math.round((d.completed / maxCount) * 100)) : 6;
+        const barColor = d.completed > 0
+            ? 'bg-gradient-to-t from-rose-500 to-teal-400'
+            : 'bg-slate-800';
+        return `
+            <div class="flex flex-col items-center justify-end h-full gap-1.5 pb-2" title="${d.label}: ${d.completed} completed, ${d.added} added">
+                <span class="text-[10px] font-bold ${d.completed > 0 ? 'text-teal-300' : 'text-slate-600'}">${d.completed}</span>
+                <div class="w-full max-w-[26px] rounded-t-lg transition-all duration-300 ${barColor}" style="height: ${heightPct}%;"></div>
+                <span class="text-[10px] text-slate-400 font-medium">${d.label}</span>
+            </div>
+        `;
+    }).join('');
+
+    summaryEl.innerHTML = `
+        <div class="p-3 rounded-xl bg-slate-950/70 border border-white/5">
+            <span class="text-slate-400 block text-[11px]">Completed (7 Days)</span>
+            <span class="text-white font-bold text-sm mt-0.5 block">${weeklyCompleted} / ${weeklyAdded || weeklyCompleted} tasks</span>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-950/70 border border-white/5">
+            <span class="text-slate-400 block text-[11px]">Top Focus Area</span>
+            <span class="text-teal-300 font-bold text-sm mt-0.5 block">${escapeHtml(topCategory)}</span>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-950/70 border border-white/5">
+            <span class="text-slate-400 block text-[11px]">Most Productive Day</span>
+            <span class="text-rose-300 font-bold text-sm mt-0.5 block">${escapeHtml(bestDayText)}</span>
+        </div>
+    `;
+}
+
+function summarizeWeeklyWorkWithBloomAI() {
+    const { days, weeklyCompleted, weeklyAdded, topCategory, bestDayText } = getWeeklyTaskStats();
+    const dailyBreakdown = days.map(d => `${d.label}: ${d.completed} completed (${d.added} added)`).join(', ');
+    const openTasks = tasks.filter(t => !t.completed).slice(0, 5).map(t => `- ${t.title} [${t.priority}]`).join('\n');
+
+    const prompt = `Review my 7-day task progress and give me an encouraging, practical work summary:\n` +
+        `• Completed this week: ${weeklyCompleted} (Added: ${weeklyAdded})\n` +
+        `• Top category: ${topCategory}\n` +
+        `• Best day: ${bestDayText}\n` +
+        `• Daily breakdown: ${dailyBreakdown}\n` +
+        (openTasks ? `\nRemaining open tasks:\n${openTasks}\n` : '') +
+        `\nHighlight what went well, spot any patterns, and suggest 1 realistic priority for tomorrow.`;
+
+    switchTab('chat');
+    const input = document.getElementById('chat-input');
+    if (input) {
+        input.value = prompt;
+        input.focus();
+    }
+}

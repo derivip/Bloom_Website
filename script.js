@@ -330,7 +330,7 @@ function switchTab(tabId) {
     const mainEl = document.getElementById('main-content');
 
     if (activeView) activeView.classList.remove('hidden');
-    if (mainEl) mainEl.classList.toggle('bloom-chat-active', tabId === 'chat');
+    if (mainEl) mainEl.classList.toggle('bloom-chat-active', tabId === 'chat'); document.body.classList.toggle('overflow-hidden', tabId === 'chat');
     if (activeNav) {
         activeNav.classList.add('bg-white/15', 'text-white');
         activeNav.classList.remove('text-slate-400');

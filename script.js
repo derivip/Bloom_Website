@@ -175,6 +175,24 @@ async function fetchAiMicroSteps(taskTitle, elementId) {
         const stepsText = cleanModelMarkdown(rawSteps);
         const escapedTitle = escapeJsSingleQuote(taskTitle);
 
+        function elaborateTaskStepsWithBloomAI(taskTitle, stepsElementId) {
+    const stepsBox = document.getElementById(stepsElementId);
+    const stepsText = stepsBox ? stepsBox.innerText.trim() : '';
+    const prompt = stepsText
+        ? `Elaborate on these micro-steps for "${taskTitle}":\n${stepsText}\n\nGive concrete examples, quick tips, and a simple way to tackle step 1 right now.`
+        : `Elaborate on how to break down and start "${taskTitle}" with clear, practical micro-steps and examples.`;
+
+    if (typeof switchTab === 'function') {
+        switchTab('chat');
+    }
+
+    const input = document.getElementById('chat-input');
+    if (input) {
+        input.value = prompt;
+        input.focus();
+    }
+}
+
         container.innerHTML = `
             <div class="mt-3 p-3.5 rounded-xl bg-slate-950/90 border border-teal-500/30 text-xs space-y-2 shadow-inner">
                 <div class="flex items-center justify-between flex-wrap gap-2">
@@ -189,6 +207,10 @@ async function fetchAiMicroSteps(taskTitle, elementId) {
                         <i data-lucide="refresh-cw" class="w-3 h-3"></i>
                         <span>Regenerate with AI</span>
                     </button>
+                    <button type="button" onclick="elaborateTaskStepsWithBloomAI('${escapedTitle}', '${elementId}')" class="text-[11px] text-rose-300 hover:text-rose-200 font-semibold flex items-center gap-1 transition-colors">
+    <i data-lucide="sparkles" class="w-3 h-3"></i>
+    <span>Elaborate with Bloom AI</span>
+</button>
                 </div>
                 <div class="text-slate-200 leading-relaxed whitespace-pre-line">${escapeHtml(stepsText)}</div>
             </div>

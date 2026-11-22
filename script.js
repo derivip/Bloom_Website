@@ -114,7 +114,15 @@ async function toggleTask(id) {
         .from('tasks')
         .update({ completed: !taskToToggle.completed })
         .eq('id', id);
-
+    
+const completionMap = JSON.parse(localStorage.getItem('bloom_task_completed_dates') || '{}');
+if (!taskToToggle.completed) {
+    completionMap[String(id)] = new Date().toISOString();
+} else {
+    delete completionMap[String(id)];
+}
+localStorage.setItem('bloom_task_completed_dates', JSON.stringify(completionMap));
+    
     if (error) {
         console.error('Error updating task:', error);
         return;
@@ -1350,6 +1358,110 @@ document.addEventListener('DOMContentLoaded', async () => {
         switchTab('chat');
     }
 
+    const input = document.getElementById('chat-input');
+    if (input) {
+        input.value = prompt;
+        input.focus();
+    }
+}
+
+function getWeeklyTaskStats() {
+    const completionMap = JSON.parse(localStorage.getItem('bloom_task_completed_dates') || '{}');
+    const days = [];
+    const now = new Date();
+
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(now.getDate() - i);
+        const key = d.toISOString().slice(0, 10);
+        const label = d.toLocaleDateString('en-US', { weekday: 'short' });
+        days.push({ key, label, completed: 0, added: 0 });
+    }
+
+    const dayLookup = Object.fromEntries(days.map(d => [d.key, d]));
+    const categoryCounts = {};
+    let weeklyCompleted = 0;
+    let weeklyAdded = 0;
+
+    tasks.forEach(t => {
+        const createdKey = t.created_at ? new Date(t.created_at).toISOString().slice(0, 10) : '';
+        if (dayLookup[createdKey]) {
+            dayLookup[createdKey].added += 1;
+            weeklyAdded += 1;
+        }
+
+        if (t.completed) {
+            const rawDoneDate = completionMap[String(t.id)] || t.completed_at || t.created_at;
+            const doneKey = rawDoneDate ? new Date(rawDoneDate).toISOString().slice(0, 10) : '';
+            if (dayLookup[doneKey]) {
+                dayLookup[doneKey].completed += 1;
+                weeklyCompleted += 1;
+                const cat = t.category || 'General';
+                categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+            }
+        }
+    });
+
+    const topCategoryEntry = Object.entries(categoryCounts).sort((a, b) => b[1] - a[1])[0];
+    const topCategory = topCategoryEntry ? `${topCategoryEntry[0]} (${topCategoryEntry[1]})` : 'None yet';
+    const bestDay = [...days].sort((a, b) => b.completed - a.completed)[0];
+    const bestDayText = bestDay && bestDay.completed > 0 ? `${bestDay.label} (${bestDay.completed})` : '—';
+
+    return { days, weeklyCompleted, weeklyAdded, topCategory, bestDayText };
+}
+
+function renderWeeklyProgressChart() {
+    const chartEl = document.getElementById('weekly-progress-chart');
+    const summaryEl = document.getElementById('weekly-work-summary');
+    if (!chartEl || !summaryEl) return;
+
+    const { days, weeklyCompleted, weeklyAdded, topCategory, bestDayText } = getWeeklyTaskStats();
+    const maxCount = Math.max(1, ...days.map(d => Math.max(d.completed, d.added)));
+
+    chartEl.innerHTML = days.map(d => {
+        const heightPct = d.completed > 0 ? Math.max(16, Math.round((d.completed / maxCount) * 100)) : 6;
+        const barColor = d.completed > 0
+            ? 'bg-gradient-to-t from-rose-500 to-teal-400'
+            : 'bg-slate-800';
+        return `
+            <div class="flex flex-col items-center justify-end h-full gap-1.5 pb-2" title="${d.label}: ${d.completed} completed, ${d.added} added">
+                <span class="text-[10px] font-bold ${d.completed > 0 ? 'text-teal-300' : 'text-slate-600'}">${d.completed}</span>
+                <div class="w-full max-w-[26px] rounded-t-lg transition-all duration-300 ${barColor}" style="height: ${heightPct}%;"></div>
+                <span class="text-[10px] text-slate-400 font-medium">${d.label}</span>
+            </div>
+        `;
+    }).join('');
+
+    summaryEl.innerHTML = `
+        <div class="p-3 rounded-xl bg-slate-950/70 border border-white/5">
+            <span class="text-slate-400 block text-[11px]">Completed (7 Days)</span>
+            <span class="text-white font-bold text-sm mt-0.5 block">${weeklyCompleted} / ${weeklyAdded || weeklyCompleted} tasks</span>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-950/70 border border-white/5">
+            <span class="text-slate-400 block text-[11px]">Top Focus Area</span>
+            <span class="text-teal-300 font-bold text-sm mt-0.5 block">${escapeHtml(topCategory)}</span>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-950/70 border border-white/5">
+            <span class="text-slate-400 block text-[11px]">Most Productive Day</span>
+            <span class="text-rose-300 font-bold text-sm mt-0.5 block">${escapeHtml(bestDayText)}</span>
+        </div>
+    `;
+}
+
+function summarizeWeeklyWorkWithBloomAI() {
+    const { days, weeklyCompleted, weeklyAdded, topCategory, bestDayText } = getWeeklyTaskStats();
+    const dailyBreakdown = days.map(d => `${d.label}: ${d.completed} completed (${d.added} added)`).join(', ');
+    const openTasks = tasks.filter(t => !t.completed).slice(0, 5).map(t => `- ${t.title} [${t.priority}]`).join('\n');
+
+    const prompt = `Review my 7-day task progress and give me an encouraging, practical work summary:\n` +
+        `• Completed this week: ${weeklyCompleted} (Added: ${weeklyAdded})\n` +
+        `• Top category: ${topCategory}\n` +
+        `• Best day: ${bestDayText}\n` +
+        `• Daily breakdown: ${dailyBreakdown}\n` +
+        (openTasks ? `\nRemaining open tasks:\n${openTasks}\n` : '') +
+        `\nHighlight what went well, spot any patterns, and suggest 1 realistic priority for tomorrow.`;
+
+    switchTab('chat');
     const input = document.getElementById('chat-input');
     if (input) {
         input.value = prompt;
